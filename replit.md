@@ -1,29 +1,35 @@
 # Fitness Cycle Tracker
 
-A mobile-first workout cycle tracker focused on strength, cardio, recovery, and sustainable fitness progression.
+A mobile-first workout cycle tracker. Next.js + TypeScript + Tailwind CSS + Supabase.
 
 ## Tech Stack
 
-- React + TypeScript + Vite
-- localStorage for persistence (no backend needed)
-- Single-page app with tab navigation
+- Next.js 16 (App Router)
+- TypeScript
+- Tailwind CSS v4
+- Supabase (Auth + PostgreSQL with RLS)
 
 ## Project Structure
 
 ```
-src/
-  App.tsx           - Root component, page routing
-  index.css         - Global styles and CSS variables
-  main.tsx          - Entry point
-  components/
-    NavBar.tsx      - Bottom navigation bar
-  pages/
-    Dashboard.tsx   - Home overview with active cycle and recent workouts
-    Cycles.tsx      - Manage workout cycles
-    Workouts.tsx    - Log and track individual workouts
-    Progress.tsx    - Statistics and progress overview
-  data/
-    storage.ts      - localStorage CRUD helpers and data types
+app/
+  layout.tsx        - Root layout, dark theme
+  globals.css       - Tailwind v4 import + theme tokens
+  page.tsx          - Root redirect (auth or dashboard)
+  auth/page.tsx     - Login / Register page
+  dashboard/page.tsx - Main dashboard (week summary, next workout, log)
+components/
+  LogWorkoutModal.tsx - Bottom-sheet modal for logging workouts
+  WorkoutCard.tsx     - Single workout entry card
+  WeekSummary.tsx     - Current week stats (time, sessions, cycle days)
+  NextWorkout.tsx     - Next recommended workout in A/B/C sequence
+lib/
+  types.ts             - TypeScript types
+  supabase/client.ts   - Browser Supabase client
+  supabase/server.ts   - Server Supabase client
+  supabase/middleware.ts - Session refresh helper
+proxy.ts              - Next.js proxy (auth redirect guard)
+supabase-setup.sql    - Run this in Supabase SQL editor to create the table + RLS
 ```
 
 ## Running
@@ -34,7 +40,17 @@ npm run dev
 
 Runs on port 5000.
 
+## Supabase Setup
+
+Run `supabase-setup.sql` in your Supabase SQL editor before using the app.
+
+## Environment Variables
+
+- `NEXT_PUBLIC_SUPABASE_URL` — your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — your Supabase anon key
+
 ## User Preferences
 
 - Mobile-first design (max-width 480px)
 - Dark theme
+- Keep it simple — Phase 1 only

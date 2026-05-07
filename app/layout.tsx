@@ -1,0 +1,29 @@
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Cycle Tracker",
+  description: "Mobile-first workout cycle tracker",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="bg-bg text-white min-h-screen antialiased">
+        <div className="max-w-[480px] mx-auto min-h-screen flex flex-col">
+          {children}
+        </div>
+      </body>
+    </html>
+  );
+}
