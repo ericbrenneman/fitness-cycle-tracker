@@ -126,6 +126,7 @@ export default function AuthPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
+              suppressHydrationWarning
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-white text-sm placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
             />
           </div>
@@ -139,6 +140,7 @@ export default function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
+              suppressHydrationWarning
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-white text-sm placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
             />
           </div>
