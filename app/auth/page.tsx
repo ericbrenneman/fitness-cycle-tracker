@@ -42,18 +42,20 @@ export default function AuthPage() {
 
     try {
       if (mode === "login") {
+        console.log("[login] attempting signInWithPassword for", email.trim());
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
+        console.log("[login] result — error:", error, "session:", !!data?.session, "user:", data?.user?.email);
         if (error) throw error;
         if (data.session) {
+          console.log("[login] session ok, redirecting to dashboard");
           router.push("/dashboard");
           router.refresh();
         } else {
-          // Session is null when email confirmation is still pending
           setError(
-            "Login succeeded but no session was returned. If you haven't confirmed your email yet, check your inbox and click the confirmation link, then try logging in again."
+            "Login succeeded but no session was created. Your account may still need email confirmation — check your inbox, or go to Supabase → Authentication → Users and manually confirm your email there."
           );
         }
       } else {
