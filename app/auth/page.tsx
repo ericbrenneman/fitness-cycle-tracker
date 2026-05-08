@@ -11,7 +11,9 @@ function getConfigIssues() {
   if (!url) issues.push("NEXT_PUBLIC_SUPABASE_URL is not set");
   else if (!url.startsWith("https://")) issues.push(`URL must start with https:// — got: "${url.slice(0, 30)}"`);
   if (!key) issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is not set");
-  else if (key.length < 100) issues.push("Anon key looks too short — copy the full value from Supabase");
+    else if (!key.startsWith("sb_publishable_") && !key.startsWith("eyJ")) {
+      issues.push("Anon key should start with sb_publishable_ or eyJ");
+    }
   return issues;
 }
 
