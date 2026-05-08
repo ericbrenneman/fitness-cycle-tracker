@@ -1,20 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
-function getSupabaseUrlStatus() {
+function getConfigIssues() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   const issues: string[] = [];
-  if (!url) {
-    issues.push("NEXT_PUBLIC_SUPABASE_URL is not set");
-  } else if (!url.startsWith("https://")) {
-    issues.push(`URL must start with https:// — got: "${url.slice(0, 30)}…"`);
-  }
+  if (!url) issues.push("NEXT_PUBLIC_SUPABASE_URL is not set");
+  else if (!url.startsWith("https://")) issues.push(`URL must start with https:// — got: "${url.slice(0, 30)}"`);
   if (!key) issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is not set");
-  else if (key.length < 100) issues.push("Anon key looks too short — make sure you copied the full value");
+  else if (key.length < 100) issues.push("Anon key looks too short — copy the full value from Supabase");
   return issues;
 }
 
@@ -28,25 +25,20 @@ export default function AuthPage() {
   const [configIssues, setConfigIssues] = useState<string[]>([]);
   const router = useRouter();
 
+  // Stable single client — never recreated, avoids multiple-GoTrueClient warnings
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
+
   useEffect(() => {
-    const issues = getSupabaseUrlStatus();
+    const issues = getConfigIssues();
     setConfigIssues(issues);
-    if (issues.length) console.error("[Supabase config issues]", issues);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-
-    const issues = getSupabaseUrlStatus();
-    if (issues.length) {
-      setError("Supabase is not configured correctly. See the warning above.");
-      return;
-    }
-
     setLoading(true);
-    const supabase = createClient();
 
     try {
       if (mode === "login") {
@@ -58,6 +50,11 @@ export default function AuthPage() {
         if (data.session) {
           router.push("/dashboard");
           router.refresh();
+        } else {
+          // Session is null when email confirmation is still pending
+          setError(
+            "Login succeeded but no session was returned. If you haven't confirmed your email yet, check your inbox and click the confirmation link, then try logging in again."
+          );
         }
       } else {
         const { error } = await supabase.auth.signUp({
@@ -69,13 +66,12 @@ export default function AuthPage() {
         });
         if (error) throw error;
         setSuccess(
-          "Account created! You can log in now. (If email confirmation is required, check your inbox first.)"
+          "Account created! Check your inbox for a confirmation email, then come back and log in. (If you don't see it, check your spam folder.)"
         );
         setMode("login");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("[Auth error]", err);
       setError(msg);
     } finally {
       setLoading(false);
@@ -91,7 +87,6 @@ export default function AuthPage() {
           <p className="text-muted text-sm mt-1">Track your training cycles</p>
         </div>
 
-        {/* Config warning — only visible when env vars are wrong */}
         {configIssues.length > 0 && (
           <div className="mb-6 bg-yellow-400/10 border border-yellow-400/30 rounded-xl px-4 py-3">
             <p className="text-yellow-300 text-xs font-semibold mb-1">Supabase configuration issue</p>
@@ -105,11 +100,7 @@ export default function AuthPage() {
           {(["login", "register"] as const).map((m) => (
             <button
               key={m}
-              onClick={() => {
-                setMode(m);
-                setError(null);
-                setSuccess(null);
-              }}
+              onClick={() => { setMode(m); setError(null); setSuccess(null); }}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                 mode === m ? "bg-accent text-white" : "text-muted hover:text-white"
               }`}
@@ -152,17 +143,12 @@ export default function AuthPage() {
             <div className="bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-3">
               <p className="text-red-400 text-xs font-semibold mb-0.5">Error</p>
               <p className="text-red-300 text-xs leading-relaxed">{error}</p>
-              {error.toLowerCase().includes("invalid") && (
-                <p className="text-red-400/60 text-xs mt-2">
-                  Tip: check that your Supabase URL and anon key are correct in Replit Secrets.
-                </p>
-              )}
             </div>
           )}
           {success && (
-            <p className="text-green-400 text-sm bg-green-400/10 border border-green-400/20 rounded-xl px-4 py-3">
-              {success}
-            </p>
+            <div className="bg-green-400/10 border border-green-400/20 rounded-xl px-4 py-3">
+              <p className="text-green-300 text-xs leading-relaxed">{success}</p>
+            </div>
           )}
 
           <button
@@ -170,11 +156,7 @@ export default function AuthPage() {
             disabled={loading || configIssues.length > 0}
             className="w-full bg-accent text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors mt-1"
           >
-            {loading
-              ? "Please wait…"
-              : mode === "login"
-              ? "Log In"
-              : "Create Account"}
+            {loading ? "Please wait…" : mode === "login" ? "Log In" : "Create Account"}
           </button>
         </form>
 
