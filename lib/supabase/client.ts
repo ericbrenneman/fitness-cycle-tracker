@@ -1,13 +1,21 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+let client: ReturnType<typeof createSupabaseClient> | null = null;
 
 export function createClient() {
-  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const key = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
-  let url = raw;
-  try {
-    url = new URL(raw).origin;
-  } catch {
-    url = raw.replace(/\/+$/, "").replace(/\/(rest|auth|storage|realtime).*$/, "");
-  }
-  return createBrowserClient(url, key);
+  if (client) return client;
+  client = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: true,
+        storageKey: "fitness-tracker-auth",
+        storage: typeof window !== "undefined" ? window.localStorage : undefined,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    }
+  );
+  return client;
 }

@@ -11,9 +11,6 @@ function getConfigIssues() {
   if (!url) issues.push("NEXT_PUBLIC_SUPABASE_URL is not set");
   else if (!url.startsWith("https://")) issues.push(`URL must start with https:// — got: "${url.slice(0, 30)}"`);
   if (!key) issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is not set");
-    else if (!key.startsWith("sb_publishable_") && !key.startsWith("eyJ")) {
-      issues.push("Anon key should start with sb_publishable_ or eyJ");
-    }
   return issues;
 }
 
@@ -27,7 +24,6 @@ export default function AuthPage() {
   const [configIssues, setConfigIssues] = useState<string[]>([]);
   const router = useRouter();
 
-  // Stable single client — never recreated, avoids multiple-GoTrueClient warnings
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
@@ -49,17 +45,11 @@ export default function AuthPage() {
           email: email.trim(),
           password,
         });
-        console.log("[login] result — error:", error, "session:", !!data?.session, "user:", data?.user?.email);
+        console.log("[login] result — error:", error, "user:", data?.user?.email);
         if (error) throw error;
-        if (data.session) {
-          console.log("[login] session ok, redirecting to dashboard");
-          router.push("/dashboard");
-          router.refresh();
-        } else {
-          setError(
-            "Login succeeded but no session was created. Your account may still need email confirmation — check your inbox, or go to Supabase → Authentication → Users and manually confirm your email there."
-          );
-        }
+        console.log("[login] sign in ok, redirecting to dashboard");
+        router.push("/dashboard");
+        router.refresh();
       } else {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
@@ -70,7 +60,7 @@ export default function AuthPage() {
         });
         if (error) throw error;
         setSuccess(
-          "Account created! Check your inbox for a confirmation email, then come back and log in. (If you don't see it, check your spam folder.)"
+          "Account created! You can now log in."
         );
         setMode("login");
       }

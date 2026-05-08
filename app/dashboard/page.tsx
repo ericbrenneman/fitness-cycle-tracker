@@ -40,10 +40,25 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use getSession first — it reads the cookie synchronously
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("[dashboard] session check:", !!session, session?.user?.email);
+      console.log("[dashboard] localStorage key:", typeof window !== "undefined" ? !!window.localStorage.getItem("fitness-tracker-auth") : "SSR");
       if (cancelled) return;
-      if (!user) { router.push("/auth"); return; }
-      setUser({ email: user.email, id: user.id });
+      if (!session) {
+        // Wait briefly then re-check before redirecting — handles post-login race
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data: { session: retrySession } } = await supabase.auth.getSession();
+        if (!retrySession) {
+          router.push("/auth");
+          return;
+        }
+        setUser({ email: retrySession.user.email, id: retrySession.user.id });
+        await fetchLogs();
+        if (!cancelled) setLoading(false);
+        return;
+      }
+      setUser({ email: session.user.email, id: session.user.id });
       await fetchLogs();
       if (!cancelled) setLoading(false);
     };
@@ -53,7 +68,12 @@ export default function DashboardPage() {
   }, []);
 
   const handleLogWorkout = async (entry: WorkoutLogInsert) => {
-    const { error } = await supabase.from("workout_logs").insert(entry);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return "Not logged in";
+    const { error } = await supabase.from("workout_logs").insert({
+      ...entry,
+      user_id: session.user.id,
+    });
     if (!error) {
       await fetchLogs();
       setShowModal(false);
