@@ -3,8 +3,14 @@ import { cookies } from "next/headers";
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, "");
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim();
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const key = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
+  let url = raw;
+  try {
+    url = new URL(raw).origin;
+  } catch {
+    url = raw.replace(/\/+$/, "").replace(/\/(rest|auth|storage|realtime).*$/, "");
+  }
   return createServerClient(url, key, {
     cookies: {
       getAll() {

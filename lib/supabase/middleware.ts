@@ -1,18 +1,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function getSupabaseOrigin(raw: string): string {
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return raw.replace(/\/+$/, "").replace(/\/(rest|auth|storage|realtime).*$/, "");
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-  // If credentials aren't configured at all, just let the request through.
   if (!rawUrl || !rawKey) {
     return supabaseResponse;
   }
 
-  const url = rawUrl.replace(/\/+$/, "").trim();
+  const url = getSupabaseOrigin(rawUrl);
   const key = rawKey.trim();
 
   let user: { id: string } | null = null;
@@ -38,8 +45,6 @@ export async function updateSession(request: NextRequest) {
     const result = await supabase.auth.getUser();
     user = result.data?.user ?? null;
   } catch (err) {
-    // If Supabase is unreachable or throws, pass the request through.
-    // The individual pages handle their own auth checks.
     console.error("[proxy] Supabase auth check failed:", err);
     return supabaseResponse;
   }

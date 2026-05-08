@@ -8,8 +8,11 @@ function getSupabaseUrlStatus() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   const issues: string[] = [];
-  if (!url) issues.push("NEXT_PUBLIC_SUPABASE_URL is not set");
-  else if (!url.startsWith("https://")) issues.push(`URL must start with https:// — got: "${url.slice(0, 30)}…"`);
+  if (!url) {
+    issues.push("NEXT_PUBLIC_SUPABASE_URL is not set");
+  } else if (!url.startsWith("https://")) {
+    issues.push(`URL must start with https:// — got: "${url.slice(0, 30)}…"`);
+  }
   if (!key) issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is not set");
   else if (key.length < 100) issues.push("Anon key looks too short — make sure you copied the full value");
   return issues;
