@@ -77,8 +77,8 @@ export default function AuthPage() {
       <div className="w-full max-w-sm">
         <div className="mb-10 text-center">
           <div className="text-4xl mb-3">🏋️</div>
-          <h1 className="text-2xl font-bold tracking-tight">Cycle Tracker</h1>
-          <p className="text-muted text-sm mt-1">Track your training cycles</p>
+          <h1 className="text-2xl font-bold tracking-tight">Apex Training Log</h1>
+          <p className="text-muted text-sm mt-1">Your personal training cycle</p>
         </div>
 
         {configIssues.length > 0 && (

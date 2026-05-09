@@ -8,9 +8,10 @@ import LogWorkoutModal from "@/components/LogWorkoutModal";
 import WorkoutCard from "@/components/WorkoutCard";
 import WeekSummary from "@/components/WeekSummary";
 import NextWorkout from "@/components/NextWorkout";
+import RecoveryWarning from "@/components/RecoveryWarning";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<{ email?: string; id: string } | null>(null);
+  const [_user, setUser] = useState<{ email?: string; id: string } | null>(null);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export default function DashboardPage() {
       .from("workout_logs")
       .select("*")
       .order("logged_at", { ascending: false })
-      .limit(7);
+      .limit(50);
 
     if (error) {
       console.error("[fetchLogs error]", error);
@@ -42,8 +43,6 @@ export default function DashboardPage() {
     const init = async () => {
       // Use getSession first — it reads the cookie synchronously
       const { data: { session } } = await supabase.auth.getSession();
-      console.log("[dashboard] session check:", !!session, session?.user?.email);
-      console.log("[dashboard] localStorage key:", typeof window !== "undefined" ? !!window.localStorage.getItem("fitness-tracker-auth") : "SSR");
       if (cancelled) return;
       if (!session) {
         // Wait briefly then re-check before redirecting — handles post-login race
@@ -70,7 +69,8 @@ export default function DashboardPage() {
   const handleLogWorkout = async (entry: WorkoutLogInsert) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return "Not logged in";
-    const { error } = await supabase.from("workout_logs").insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("workout_logs") as any).insert({
       ...entry,
       user_id: session.user.id,
     });
@@ -106,14 +106,22 @@ export default function DashboardPage() {
               day: "numeric",
             })}
           </p>
-          <h1 className="text-xl font-bold">Your Dashboard</h1>
+          <h1 className="text-xl font-bold">Apex Training Log</h1>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="text-muted text-xs hover:text-white transition-colors border border-border rounded-lg px-3 py-1.5"
-        >
-          Sign out
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => router.push("/history")}
+            className="text-muted text-xs hover:text-white transition-colors border border-border rounded-lg px-3 py-1.5"
+          >
+            History
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="text-muted text-xs hover:text-white transition-colors border border-border rounded-lg px-3 py-1.5"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 px-4">
@@ -130,15 +138,21 @@ export default function DashboardPage() {
         )}
 
         <WeekSummary logs={logs} />
+        <RecoveryWarning logs={logs} />
         <NextWorkout logs={logs} />
 
         <button
-          onClick={() => setShowModal(true)}
-          disabled={!!dbError}
-          className="w-full bg-accent text-white font-semibold py-3.5 rounded-2xl text-sm hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          + Log Workout
-        </button>
+  onClick={() => router.push("/workout")}
+  className="w-full bg-accent text-white font-semibold py-3.5 rounded-2xl text-sm hover:bg-accent/90 transition-colors"
+>
+  ▶ Start Next Workout
+</button>
+<button
+  onClick={() => router.push("/recovery")}
+  className="w-full bg-surface border border-border text-white font-semibold py-3.5 rounded-2xl text-sm hover:border-accent/50 transition-colors"
+>
+  🧖 Log Recovery / Sauna
+</button>
 
         <div>
           <h2 className="text-xs font-semibold text-muted tracking-wider uppercase mb-3">
