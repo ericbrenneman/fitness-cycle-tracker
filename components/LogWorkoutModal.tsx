@@ -16,7 +16,9 @@ const TYPE_META: Record<WorkoutType, { emoji: string; advancesCycle: boolean }> 
   Sauna:    { emoji: "🧖", advancesCycle: false },
   Mobility: { emoji: "🤸", advancesCycle: false },
   Illness:  { emoji: "🤒", advancesCycle: false },
-  Other:    { emoji: "📝", advancesCycle: false },
+  Other:        { emoji: "📝", advancesCycle: false },
+  "Red Light":  { emoji: "💡", advancesCycle: false },
+  PEMF:         { emoji: "🔋", advancesCycle: false },
 };
 
 interface Props {
