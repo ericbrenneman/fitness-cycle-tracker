@@ -67,24 +67,29 @@ export default function DashboardPage() {
   }, []);
 
   const handleLogWorkout = async (entry: WorkoutLogInsert) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
     if (!session) return "Not logged in";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const { error } = await supabase
-    .from("workout_logs")
-    .insert({
-      workout_type: entry.workout_type,
-      duration: entry.duration,
-      effort: entry.effort,
-      notes: entry.notes,
-      advances_cycle: entry.advances_cycle,
-      logged_at: entry.logged_at,
-      user_id: session.user.id,
-    } as never);
+      .from("workout_logs")
+      .insert({
+        workout_type: entry.workout_type,
+        duration: entry.duration,
+        effort: entry.effort,
+        notes: entry.notes,
+        advances_cycle: entry.advances_cycle,
+        logged_at: entry.logged_at,
+        user_id: session.user.id,
+      });
+
     if (!error) {
       await fetchLogs();
       setShowModal(false);
     }
+
     return error?.message ?? null;
   };
 
