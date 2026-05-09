@@ -1,4 +1,4 @@
-import { WorkoutLog, WorkoutType } from "@/lib/types";
+import { WorkoutLog } from "@/lib/types";
 
 const TYPE_META: Record<string, { emoji: string; color: string; label: string }> = {
   A: {
@@ -49,12 +49,12 @@ const TYPE_META: Record<string, { emoji: string; color: string; label: string }>
 };
 
 export default function WorkoutCard({ log }: { log: WorkoutLog }) {
-  const workoutType = log.workout_type as WorkoutType | string;
+  const workoutType = String(log.workout_type ?? "Other");
   const meta = TYPE_META[workoutType] ?? TYPE_META.Other;
 
   const date = new Date(log.logged_at);
   const dateStr = Number.isNaN(date.getTime())
-    ? "Unknown date"
+    ? String(log.logged_at ?? "")
     : date.toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
