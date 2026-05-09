@@ -540,9 +540,21 @@ function DetailView({
               {log.recovery_detail.soreness && <Stat label="Soreness" value={log.recovery_detail.soreness} />}
               {log.recovery_detail.illness_symptoms && <Stat label="Symptoms" value={log.recovery_detail.illness_symptoms} />}
             </div>
-            {log.recovery_detail.notes && (
-              <p className="text-sm text-white/70 mt-3">{log.recovery_detail.notes}</p>
-            )}
+            {(log.recovery_detail as any).recovery_tags?.length > 0 && (
+  <div className="flex flex-wrap gap-2 mt-3">
+    {(log.recovery_detail as any).recovery_tags.map((tag: string) => (
+      <span
+        key={tag}
+        className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white"
+      >
+        {tag}
+      </span>
+    ))}
+  </div>
+)}
+{log.recovery_detail.notes && (
+  <p className="text-sm text-white/70 mt-3">{log.recovery_detail.notes}</p>
+)}
           </div>
         )}
       </div>
