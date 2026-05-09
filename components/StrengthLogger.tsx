@@ -20,6 +20,141 @@ interface SetRow {
   notes: string;
 }
 
+const DEFAULT_REST = 90;
+
+// ============================================================
+// Rest Timer Component
+// ============================================================
+function RestTimer({
+  onDismiss,
+}: {
+  onDismiss: () => void;
+}) {
+  const [seconds, setSeconds] = useState(DEFAULT_REST);
+  const [customInput, setCustomInput] = useState(String(DEFAULT_REST));
+  const [running, setRunning] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (running && seconds > 0) {
+      intervalRef.current = setInterval(() => {
+        setSeconds((s) => s - 1);
+      }, 1000);
+    } else if (seconds === 0) {
+      setRunning(false);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [running, seconds]);
+
+  const restart = (secs: number) => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setSeconds(secs);
+    setRunning(true);
+  };
+
+  const togglePause = () => setRunning((r) => !r);
+
+  const pct = seconds / DEFAULT_REST;
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const dash = circumference * pct;
+  const done = seconds === 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="bg-[#1a1d27] border border-border rounded-3xl p-6 w-72 flex flex-col items-center gap-4">
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider">
+          {done ? "Rest Complete!" : "Rest Timer"}
+        </p>
+
+        {/* Circle timer */}
+        <div className="relative w-24 h-24 flex items-center justify-center">
+          <svg width="96" height="96" viewBox="0 0 96 96" className="-rotate-90">
+            <circle
+              cx="48" cy="48" r={radius}
+              fill="none"
+              stroke="#ffffff18"
+              strokeWidth="6"
+            />
+            <circle
+              cx="48" cy="48" r={radius}
+              fill="none"
+              stroke={done ? "#2ecc71" : "#6c63ff"}
+              strokeWidth="6"
+              strokeDasharray={`${dash} ${circumference}`}
+              strokeLinecap="round"
+              style={{ transition: "stroke-dasharray 1s linear" }}
+            />
+          </svg>
+          <span className="absolute text-2xl font-bold">
+            {done ? "✓" : seconds}
+          </span>
+        </div>
+
+        {/* Quick adjust buttons */}
+        <div className="flex gap-2">
+          {[60, 90, 120].map((s) => (
+            <button
+              key={s}
+              onClick={() => { restart(s); setCustomInput(String(s)); }}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors ${
+                DEFAULT_REST === s && seconds === s
+                  ? "border-accent bg-accent/10 text-white"
+                  : "border-border text-muted hover:text-white"
+              }`}
+            >
+              {s}s
+            </button>
+          ))}
+        </div>
+
+        {/* Custom input */}
+        <div className="flex items-center gap-2 w-full">
+          <input
+            type="number"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            placeholder="Custom secs"
+            className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-accent text-center"
+          />
+          <button
+            onClick={() => {
+              const val = parseInt(customInput);
+              if (val > 0) restart(val);
+            }}
+            className="px-3 py-2 bg-surface border border-border rounded-xl text-xs text-white hover:border-accent transition-colors"
+          >
+            Set
+          </button>
+        </div>
+
+        {/* Controls */}
+        <div className="flex gap-2 w-full">
+          {!done && (
+            <button
+              onClick={togglePause}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-white hover:border-accent transition-colors"
+            >
+              {running ? "⏸ Pause" : "▶ Resume"}
+            </button>
+          )}
+          <button
+            onClick={onDismiss}
+            className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-colors"
+          >
+            {done ? "Next Set ▶" : "Skip"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Main StrengthLogger
+// ============================================================
 export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }: Props) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
@@ -32,6 +167,7 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [lastPerf, setLastPerf] = useState<Record<string, LastPerformance | null>>({});
   const [illnessFlag, setIllnessFlag] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
 
   const [exerciseSets, setExerciseSets] = useState<Record<string, SetRow[]>>(() => {
     const init: Record<string, SetRow[]> = {};
@@ -106,6 +242,12 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }
     });
   };
 
+  // When difficulty is selected — start timer automatically
+  const logSetAndStartTimer = (exerciseName: string, setIdx: number, difficulty: string) => {
+    updateSet(exerciseName, setIdx, "perceived_difficulty", difficulty);
+    if (difficulty) setShowTimer(true);
+  };
+
   const addSet = (exerciseName: string) => {
     setExerciseSets((prev) => {
       const sets = prev[exerciseName];
@@ -126,79 +268,78 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }
   };
 
   const handleSave = async () => {
-  setSaving(true);
-  setError(null);
+    setSaving(true);
+    setError(null);
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    setError("Not logged in");
-    setSaving(false);
-    return;
-  }
-
-  const workoutPayload = {
-    user_id: session.user.id,
-    workout_type: cycleStep,
-    logged_at: date,
-    duration: parseInt(duration) || 0,
-    effort: effort ? parseInt(effort) : null,
-    notes: notes.trim() || null,
-    advances_cycle: true,
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: logData, error: logError } = await (supabase.from("workout_logs") as any)
-    .insert(workoutPayload)
-    .select()
-    .single();
-
-  if (logError || !logData) {
-    setError(logError?.message ?? "Failed to save workout");
-    setSaving(false);
-    return;
-  }
-
-  const setsToInsert: StrengthExerciseInsert[] = [];
-
-  for (const ex of template.exercises) {
-    exerciseSets[ex.name].forEach((row, i) => {
-      if (!row.reps && !row.weight) return;
-
-      setsToInsert.push({
-        workout_log_id: logData.id,
-        exercise_name: ex.name,
-        set_number: i + 1,
-        reps: row.reps ? parseInt(row.reps) : null,
-        weight: row.weight ? parseFloat(row.weight) : null,
-        unit: row.unit,
-        perceived_difficulty: row.perceived_difficulty || null,
-        notes: row.notes.trim() || null,
-      });
-    });
-  }
-
-  if (setsToInsert.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: setsError } = await (supabase.from("strength_exercises") as any)
-      .insert(setsToInsert);
-
-    if (setsError) {
-      setError(setsError.message);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setError("Not logged in");
       setSaving(false);
       return;
     }
-  }
 
-  onDone();
-};
+    const workoutPayload = {
+      user_id: session.user.id,
+      workout_type: cycleStep,
+      logged_at: date,
+      duration: parseInt(duration) || 0,
+      effort: effort ? parseInt(effort) : null,
+      notes: notes.trim() || null,
+      advances_cycle: true,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: logData, error: logError } = await (supabase.from("workout_logs") as any)
+      .insert(workoutPayload)
+      .select()
+      .single();
+
+    if (logError || !logData) {
+      setError(logError?.message ?? "Failed to save workout");
+      setSaving(false);
+      return;
+    }
+
+    const setsToInsert: StrengthExerciseInsert[] = [];
+
+    for (const ex of template.exercises) {
+      exerciseSets[ex.name].forEach((row, i) => {
+        if (!row.reps && !row.weight) return;
+        setsToInsert.push({
+          workout_log_id: logData.id,
+          exercise_name: ex.name,
+          set_number: i + 1,
+          reps: row.reps ? parseInt(row.reps) : null,
+          weight: row.weight ? parseFloat(row.weight) : null,
+          unit: row.unit,
+          perceived_difficulty: row.perceived_difficulty || null,
+          notes: row.notes.trim() || null,
+        });
+      });
+    }
+
+    if (setsToInsert.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: setsError } = await (supabase.from("strength_exercises") as any)
+        .insert(setsToInsert);
+
+      if (setsError) {
+        setError(setsError.message);
+        setSaving(false);
+        return;
+      }
+    }
+
+    onDone();
+  };
 
   const EMOJI: Record<string, string> = { A: "💪", B: "🏋️", C: "🔥" };
 
   return (
     <div className="flex flex-col flex-1 pb-10">
+      {/* Rest timer overlay */}
+      {showTimer && <RestTimer onDismiss={() => setShowTimer(false)} />}
+
       <div className="flex items-center justify-between px-4 pt-10 pb-4">
         <div>
           <p className="text-muted text-xs mb-0.5">Starting workout</p>
@@ -206,9 +347,20 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }
             {EMOJI[cycleStep]} {template.name}
           </h1>
         </div>
-        <button onClick={onDone} className="text-muted text-xs border border-border rounded-lg px-3 py-1.5 hover:text-white">
-          Cancel
-        </button>
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={() => setShowTimer(true)}
+            className="text-muted text-xs border border-border rounded-lg px-3 py-1.5 hover:text-white transition-colors"
+          >
+            ⏱ Timer
+          </button>
+          <button
+            onClick={onDone}
+            className="text-muted text-xs border border-border rounded-lg px-3 py-1.5 hover:text-white"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
 
       {illnessFlag && (
@@ -313,8 +465,9 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }
                     <option value="lb">lb</option>
                     <option value="kg">kg</option>
                   </select>
-                  <select value={row.perceived_difficulty}
-                    onChange={(e) => updateSet(ex.name, i, "perceived_difficulty", e.target.value)}
+                  <select
+                    value={row.perceived_difficulty}
+                    onChange={(e) => logSetAndStartTimer(ex.name, i, e.target.value)}
                     className="col-span-3 bg-card border border-border rounded-lg px-1 py-1.5 text-white text-xs focus:outline-none">
                     <option value="">—</option>
                     <option value="Easy">Easy</option>
