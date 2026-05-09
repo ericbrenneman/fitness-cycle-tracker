@@ -140,6 +140,18 @@ function wasAnythingLoggedToday(logs: WorkoutLog[]): boolean {
 export default function NextWorkout({ logs }: { logs: WorkoutLog[] }) {
   const lastCycleStep = getLastCycleStep(logs);
   const nextStep = getNextStep(lastCycleStep);
+  console.log("[NextWorkout debug]", {
+    totalLogs: logs.length,
+    lastCycleStep,
+    nextStep,
+    latestFive: logs.slice(0, 5).map((log) => ({
+      workout_type: log.workout_type,
+      advances_cycle: log.advances_cycle,
+      logged_at: log.logged_at,
+      created_at: "created_at" in log ? log.created_at : null,
+    })),
+  });
+  
   const meta = STEP_META[nextStep];
   const nextIdx = CYCLE_SEQUENCE.indexOf(nextStep);
   const daysSinceLast = getDaysSince(logs);
@@ -148,7 +160,7 @@ export default function NextWorkout({ logs }: { logs: WorkoutLog[] }) {
   return (
     <div className="bg-surface border border-border rounded-2xl p-4">
       <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-        Next Up
+        Next Up DEBUG
       </p>
 
       <div className="flex items-center gap-3 mb-4">
