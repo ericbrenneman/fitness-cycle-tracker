@@ -59,22 +59,41 @@ const STEP_META: Record<
 };
 
 function getLogSortTime(log: WorkoutLog): number {
-  const loggedAtTime = new Date(log.logged_at).getTime();
-
+  const loggedAt = log.logged_at ?? "";
   const createdAt =
-    "created_at" in log && log.created_at
-      ? new Date(String(log.created_at)).getTime()
-      : 0;
+    "created_at" in log && log.created_at ? String(log.created_at) : "";
+
+  const loggedAtTime = new Date(`${loggedAt}T00:00:00`).getTime();
+  const createdAtTime = createdAt ? new Date(createdAt).getTime() : 0;
 
   if (Number.isNaN(loggedAtTime)) {
-    return createdAt || 0;
+    return createdAtTime;
   }
 
-  return loggedAtTime + createdAt / 10000000000000;
+  return loggedAtTime + createdAtTime / 10000000000000;
 }
 
 function getLastCycleStep(logs: WorkoutLog[]): CycleStep | null {
-  const sorted = [...logs].sort((a, b) => getLogSortTime(a) - getLogSortTime(b));
+  const sorted = [...logs].sort((a, b) => {
+    const aLoggedAt = new Date(`${a.logged_at}T00:00:00`).getTime();
+    const bLoggedAt = new Date(`${b.logged_at}T00:00:00`).getTime();
+
+    if (aLoggedAt !== bLoggedAt) {
+      return aLoggedAt - bLoggedAt;
+    }
+
+    const aCreatedAt =
+      "created_at" in a && a.created_at
+        ? new Date(String(a.created_at)).getTime()
+        : 0;
+
+    const bCreatedAt =
+      "created_at" in b && b.created_at
+        ? new Date(String(b.created_at)).getTime()
+        : 0;
+
+    return aCreatedAt - bCreatedAt;
+  });
 
   let lastStep: CycleStep | null = null;
 
