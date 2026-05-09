@@ -37,6 +37,7 @@
               .select("*")
               .eq("user_id", session.user.id)
               .order("logged_at", { ascending: false })
+              .order("created_at", { ascending: false })
               .limit(50);
 
             console.log("[dashboard fetchLogs user]", session.user.id);
