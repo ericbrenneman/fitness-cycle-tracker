@@ -23,20 +23,36 @@ export default function DashboardPage() {
   const supabase = supabaseRef.current;
 
   const fetchLogs = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("workout_logs")
-      .select("*")
-      .order("logged_at", { ascending: false })
-      .limit(50);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    if (error) {
-      console.error("[fetchLogs error]", error);
-      setDbError(error.message);
-    } else {
-      setDbError(null);
-      setLogs((data as WorkoutLog[]) ?? []);
-    }
-  }, [supabase]);
+  if (!session) {
+    console.error("[dashboard fetchLogs] No session");
+    setLogs([]);
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from("workout_logs") as any)
+    .select("*")
+    .eq("user_id", session.user.id)
+    .order("logged_at", { ascending: false })
+    .limit(50);
+
+  console.log("[dashboard fetchLogs user]", session.user.id);
+  console.log("[dashboard fetchLogs data]", data);
+  console.log("[dashboard fetchLogs error]", error);
+
+  if (error) {
+    console.error("[fetchLogs error]", error);
+    setDbError(error.message);
+    setLogs([]);
+  } else {
+    setDbError(null);
+    setLogs((data as WorkoutLog[]) ?? []);
+  }
+}, [supabase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,19 +89,19 @@ export default function DashboardPage() {
 
     if (!session) return "Not logged in";
 
-    const { error } = await supabase
-    .from("workout_logs")
-    .insert([
-      {
-        workout_type: entry.workout_type,
-        duration: entry.duration,
-        effort: entry.effort,
-        notes: entry.notes,
-        advances_cycle: entry.advances_cycle,
-        logged_at: entry.logged_at,
-        user_id: session.user.id,
-      },
-    ] as never[]);
+    const workoutPayload = {
+      workout_type: entry.workout_type,
+      duration: entry.duration,
+      effort: entry.effort,
+      notes: entry.notes,
+      advances_cycle: entry.advances_cycle,
+      logged_at: entry.logged_at,
+      user_id: session.user.id,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("workout_logs") as any)
+      .insert(workoutPayload);
 
     if (!error) {
       await fetchLogs();
