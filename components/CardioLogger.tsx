@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CardioTemplate, CycleStep, CardioModality } from "@/lib/types";
+import { CardioTemplate, CardioModality } from "@/lib/types";
 
 interface Props {
   cycleStep: "Cardio1" | "Cardio2";
@@ -35,20 +35,29 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
     setSaving(true);
     setError(null);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setError("Not logged in"); setSaving(false); return; }
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    const { data: logData, error: logError } = await supabase
-      .from("workout_logs")
-      .insert({
-        user_id: session.user.id,
-        workout_type: "Cardio",
-        logged_at: date,
-        duration: parseInt(duration) || 0,
-        effort: effort ? parseInt(effort) : null,
-        notes: notes.trim() || null,
-        advances_cycle: true,
-      })
+    if (!session) {
+      setError("Not logged in");
+      setSaving(false);
+      return;
+    }
+
+    const workoutPayload = {
+      user_id: session.user.id,
+      workout_type: "Cardio",
+      logged_at: date,
+      duration: parseInt(duration) || 0,
+      effort: effort ? parseInt(effort) : null,
+      notes: notes.trim() || null,
+      advances_cycle: true,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: logData, error: logError } = await (supabase.from("workout_logs") as any)
+      .insert(workoutPayload)
       .select()
       .single();
 
@@ -58,18 +67,20 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
       return;
     }
 
-    const { error: cardioError } = await supabase
-      .from("cardio_details")
-      .insert({
-        workout_log_id: logData.id,
-        modality: modality || null,
-        distance: distance ? parseFloat(distance) : null,
-        avg_watts: avgWatts ? parseInt(avgWatts) : null,
-        total_output_kj: totalKj ? parseInt(totalKj) : null,
-        avg_heart_rate: avgHr ? parseInt(avgHr) : null,
-        max_heart_rate: maxHr ? parseInt(maxHr) : null,
-        notes: notes.trim() || null,
-      });
+    const cardioPayload = {
+      workout_log_id: logData.id,
+      modality: modality || null,
+      distance: distance ? parseFloat(distance) : null,
+      avg_watts: avgWatts ? parseInt(avgWatts) : null,
+      total_output_kj: totalKj ? parseInt(totalKj) : null,
+      avg_heart_rate: avgHr ? parseInt(avgHr) : null,
+      max_heart_rate: maxHr ? parseInt(maxHr) : null,
+      notes: notes.trim() || null,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: cardioError } = await (supabase.from("cardio_details") as any)
+      .insert(cardioPayload);
 
     if (cardioError) {
       setError(cardioError.message);
