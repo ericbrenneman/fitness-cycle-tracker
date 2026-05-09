@@ -42,7 +42,15 @@
           const [saving, setSaving] = useState(false);
           const [saveError, setSaveError] = useState<string | null>(null);
           const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-          const [workoutType, setWorkoutType] = useState<WorkoutType>("Rest");
+          const [selectedTypes, setSelectedTypes] = useState<WorkoutType[]>(["Rest"]);
+
+          const toggleType = (type: WorkoutType) => {
+            setSelectedTypes((prev) =>
+              prev.includes(type)
+                ? prev.length > 1 ? prev.filter((t) => t !== type) : prev
+                : [...prev, type]
+            );
+          };
           const [advancesCycle, setAdvancesCycle] = useState(!standalone);
           const [saunaMinutes, setSaunaMinutes] = useState("");
           const [sleepHours, setSleepHours] = useState("");
@@ -52,6 +60,7 @@
           const [illnessSymptoms, setIllnessSymptoms] = useState("");
           const [notes, setNotes] = useState("");
           const [selectedTags, setSelectedTags] = useState<string[]>([]);
+          const [saunaTemp, setSaunaTemp] = useState<string>("");
 
           const toggleTag = (tag: string) => {
             setSelectedTags((prev) =>
@@ -72,11 +81,13 @@
 
             const workoutPayload = {
               user_id: session.user.id,
-              workout_type: workoutType,
+              workout_type: selectedTypes[0],
               logged_at: date,
               duration: saunaMinutes ? parseInt(saunaMinutes) : 0,
               effort: null,
-              notes: notes.trim() || null,
+              notes: selectedTypes.length > 1
+                ? `${selectedTypes.join(" + ")}${notes.trim() ? " — " + notes.trim() : ""}`
+                : notes.trim() || null,
               advances_cycle: advancesCycle,
             };
 
@@ -95,6 +106,7 @@
             const recoveryPayload = {
               workout_log_id: logData.id,
               sauna_minutes: saunaMinutes ? parseInt(saunaMinutes) : null,
+              sauna_temp: saunaTemp ? parseInt(saunaTemp) : null,
               sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
               hrv: hrv ? parseInt(hrv) : null,
               resting_hr: restingHr ? parseInt(restingHr) : null,
@@ -145,14 +157,15 @@
                   <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
                     Activity type
                   </p>
-                  <div className="grid grid-cols-5 gap-2">
+                  <p className="text-xs text-muted mb-2">Select all that apply</p>
+                  <div className="grid grid-cols-4 gap-2">
                     {RECOVERY_TYPES.map(({ type, emoji, label }) => (
                       <button
-                        key={type}
+                        key={label}
                         type="button"
-                        onClick={() => setWorkoutType(type)}
+                        onClick={() => toggleType(type)}
                         className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-xs font-medium transition-all ${
-                          workoutType === type
+                          selectedTypes.includes(type)
                             ? "border-accent bg-accent/10 text-white"
                             : "border-border text-muted hover:text-white"
                         }`}
@@ -209,7 +222,7 @@
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-muted mb-1">Sauna (min)</label>
+                      <label className="block text-xs text-muted mb-1">Duration (min)</label>
                       <input
                         type="number"
                         value={saunaMinutes}
@@ -217,6 +230,19 @@
                         placeholder="optional"
                         className="w-full bg-card border border-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted mb-1">Sauna Temp (1–15)</label>
+                      <select
+                        value={saunaTemp}
+                        onChange={(e) => setSaunaTemp(e.target.value)}
+                        className="w-full bg-card border border-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
+                      >
+                        <option value="">—</option>
+                        {Array.from({ length: 15 }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={String(n)}>{n}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs text-muted mb-1">Sleep (hrs)</label>
@@ -260,7 +286,7 @@
                       className="w-full bg-card border border-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
                     />
                   </div>
-                  {workoutType === "Illness" && (
+                  {selectedTypes.includes("Illness") && (
                     <div>
                       <label className="block text-xs text-muted mb-1">Illness symptoms</label>
                       <input
