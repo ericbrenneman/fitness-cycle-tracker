@@ -73,7 +73,7 @@ export default function WorkoutCard({ log }: { log: WorkoutLog }) {
           </span>
 
           <span className="text-muted text-xs flex-shrink-0">
-            {dateStr}
+            {date}
           </span>
         </div>
 
