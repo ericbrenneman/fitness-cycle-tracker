@@ -46,6 +46,16 @@ const TYPE_META: Record<string, { emoji: string; color: string; label: string }>
     color: "#8b8fa8",
     label: "Other",
   },
+  "Red Light": {
+    emoji: "💡",
+    color: "#ef4444",
+    label: "Red Light Therapy",
+  },
+  PEMF: {
+    emoji: "🔋",
+    color: "#8b5cf6",
+    label: "PEMF Therapy",
+  },
 };
 
 export default function WorkoutCard({ log }: { log: WorkoutLog }) {

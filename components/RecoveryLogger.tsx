@@ -11,11 +11,13 @@
         }
 
         const RECOVERY_TYPES: { type: WorkoutType; emoji: string; label: string }[] = [
-          { type: "Rest",     emoji: "😴", label: "Rest" },
-          { type: "Sauna",    emoji: "🧖", label: "Sauna" },
-          { type: "Mobility", emoji: "🤸", label: "Mobility" },
-          { type: "Illness",  emoji: "🤒", label: "Illness" },
-          { type: "Other",    emoji: "📝", label: "Other" },
+          { type: "Rest",       emoji: "😴", label: "Rest" },
+          { type: "Sauna",      emoji: "🧖", label: "Sauna" },
+          { type: "Mobility",   emoji: "🤸", label: "Mobility" },
+          { type: "Illness",    emoji: "🤒", label: "Illness" },
+          { type: "Red Light",  emoji: "💡", label: "Red Light" },
+          { type: "PEMF",       emoji: "🔋", label: "PEMF" },
+          { type: "Other",      emoji: "📝", label: "Other" },
         ];
 
         const RECOVERY_TAGS: { label: string; emoji: string; color: string }[] = [

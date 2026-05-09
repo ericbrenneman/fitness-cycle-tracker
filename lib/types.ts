@@ -9,6 +9,8 @@ export type WorkoutType =
   | "Cardio"
   | "Rest"
   | "Sauna"
+  | "Red Light"
+  | "PEMF"
   | "Mobility"
   | "Illness"
   | "Other";

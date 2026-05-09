@@ -21,7 +21,9 @@ const TYPE_META: Record<string, { emoji: string; color: string }> = {
   Mobility: { emoji: "🤸", color: "#06b6d4" },
   Illness:  { emoji: "🤒", color: "#94a3b8" },
   Other:    { emoji: "📝", color: "#8b8fa8" },
-};
+  "Red Light": { emoji: "💡", color: "#ef4444" },
+  PEMF:      { emoji: "🔋", color: "#8b5cf6" },
+  };
 
 const TYPE_LABELS: Record<string, string> = {
   A: "Workout A — Push + Legs",
@@ -32,7 +34,9 @@ const TYPE_LABELS: Record<string, string> = {
   Sauna: "Sauna",
   Mobility: "Mobility",
   Illness: "Illness",
-  Other: "Other",
+  Other:        "Other",
+  "Red Light":  "Red Light Therapy",
+  PEMF:         "PEMF Therapy",
 };
 
 async function fetchAllLogs(
