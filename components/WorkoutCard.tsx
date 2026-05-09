@@ -52,14 +52,10 @@ export default function WorkoutCard({ log }: { log: WorkoutLog }) {
   const workoutType = String(log.workout_type ?? "Other");
   const meta = TYPE_META[workoutType] ?? TYPE_META.Other;
 
-  const date = new Date(log.logged_at);
-  const dateStr = Number.isNaN(date.getTime())
-    ? String(log.logged_at ?? "")
-    : date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
+  const [year, month, day] = log.logged_at.split("-").map(Number);
+  const date = new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+  });
 
   return (
     <div className="bg-surface border border-border rounded-2xl px-4 py-3.5 flex items-start gap-3">

@@ -67,14 +67,15 @@ function getLastCycleStep(logs: WorkoutLog[]): CycleStep | null {
       return CYCLE_SEQUENCE[(idx + 1) % CYCLE_SEQUENCE.length];
     }
 
-    function getDaysSince(logs: WorkoutLog[]): number | null {
-      if (!logs[0]) return null;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const last = new Date(logs[0].logged_at);
-      last.setHours(0, 0, 0, 0);
-      return Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-    }
+function getDaysSince(logs: WorkoutLog[]): number | null {
+  if (!logs[0]) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const [y, m, d] = logs[0].logged_at.split("-").map(Number);
+  const last = new Date(y, m - 1, d);
+  last.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+}
 
     export default function NextWorkout({ logs }: { logs: WorkoutLog[] }) {
       const lastCycleStep = getLastCycleStep(logs);
@@ -86,9 +87,10 @@ function getLastCycleStep(logs: WorkoutLog[]): CycleStep | null {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const loggedToday = logs.some((l) => {
-        const d = new Date(l.logged_at);
-        d.setHours(0, 0, 0, 0);
-        return d.getTime() === today.getTime();
+        const [y, m, d] = l.logged_at.split("-").map(Number);
+        const entryDate = new Date(y, m - 1, d);
+        entryDate.setHours(0, 0, 0, 0);
+        return entryDate.getTime() === today.getTime();
       });
 
       return (

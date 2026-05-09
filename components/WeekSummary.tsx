@@ -7,7 +7,11 @@ export default function WeekSummary({ logs }: { logs: WorkoutLog[] }) {
   startOfWeek.setDate(now.getDate() - dayOfWeek);
   startOfWeek.setHours(0, 0, 0, 0);
 
-  const weekLogs = logs.filter((l) => new Date(l.logged_at) >= startOfWeek);
+  const weekLogs = logs.filter((l) => {
+    const [year, month, day] = l.logged_at.split("-").map(Number);
+    const entryDate = new Date(year, month - 1, day);
+    return entryDate >= startOfWeek;
+  });
 
   const trainingLogs = weekLogs.filter((l) =>
     ["A", "B", "C", "Cardio"].includes(l.workout_type)

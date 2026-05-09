@@ -195,7 +195,8 @@ export default function HistoryPage() {
         ) : (
           logs.map((log) => {
             const meta = TYPE_META[log.workout_type] ?? TYPE_META.Other;
-            const date = new Date(log.logged_at).toLocaleDateString("en-US", {
+            const [yr, mo, dy] = log.logged_at.split("-").map(Number);
+            const date = new Date(yr, mo - 1, dy).toLocaleDateString("en-US", {
               weekday: "short", month: "short", day: "numeric",
             });
             return (
@@ -267,8 +268,9 @@ function DetailView({
   supabase: ReturnType<typeof createClient>;
 }) {
   const meta = TYPE_META[log.workout_type] ?? TYPE_META.Other;
-  const date = new Date(log.logged_at).toLocaleDateString("en-US", {
-    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  const [yr, mo, dy] = log.logged_at.split("-").map(Number);
+  const date = new Date(yr, mo - 1, dy).toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
   });
 
   const [editing, setEditing] = useState(false);
