@@ -44,6 +44,7 @@ async function fetchAllLogs(
     .select("*")
     .eq("user_id", userId)
     .order("logged_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(100);
 
   if (logsError) {
