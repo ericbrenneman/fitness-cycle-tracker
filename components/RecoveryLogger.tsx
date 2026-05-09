@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CycleStep, WorkoutType } from "@/lib/types";
+import { WorkoutType } from "@/lib/types";
 
 interface Props {
     cycleStep: "Rest1" | "Rest2";
@@ -39,20 +39,29 @@ export default function RecoveryLogger({ cycleStep, onDone, standalone = false }
     setSaving(true);
     setError(null);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setError("Not logged in"); setSaving(false); return; }
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    const { data: logData, error: logError } = await supabase
-      .from("workout_logs")
-      .insert({
-        user_id: session.user.id,
-        workout_type: workoutType,
-        logged_at: date,
-        duration: saunaMinutes ? parseInt(saunaMinutes) : 0,
-        effort: null,
-        notes: notes.trim() || null,
-        advances_cycle: advancesCycle,
-      })
+    if (!session) {
+      setError("Not logged in");
+      setSaving(false);
+      return;
+    }
+
+    const workoutPayload = {
+      user_id: session.user.id,
+      workout_type: workoutType,
+      logged_at: date,
+      duration: saunaMinutes ? parseInt(saunaMinutes) : 0,
+      effort: null,
+      notes: notes.trim() || null,
+      advances_cycle: advancesCycle,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: logData, error: logError } = await (supabase.from("workout_logs") as any)
+      .insert(workoutPayload)
       .select()
       .single();
 
@@ -62,18 +71,20 @@ export default function RecoveryLogger({ cycleStep, onDone, standalone = false }
       return;
     }
 
-    const { error: recoveryError } = await supabase
-      .from("recovery_details")
-      .insert({
-        workout_log_id: logData.id,
-        sauna_minutes: saunaMinutes ? parseInt(saunaMinutes) : null,
-        sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
-        hrv: hrv ? parseInt(hrv) : null,
-        resting_hr: restingHr ? parseInt(restingHr) : null,
-        soreness: soreness.trim() || null,
-        illness_symptoms: illnessSymptoms.trim() || null,
-        notes: notes.trim() || null,
-      });
+    const recoveryPayload = {
+      workout_log_id: logData.id,
+      sauna_minutes: saunaMinutes ? parseInt(saunaMinutes) : null,
+      sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
+      hrv: hrv ? parseInt(hrv) : null,
+      resting_hr: restingHr ? parseInt(restingHr) : null,
+      soreness: soreness.trim() || null,
+      illness_symptoms: illnessSymptoms.trim() || null,
+      notes: notes.trim() || null,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: recoveryError } = await (supabase.from("recovery_details") as any)
+      .insert(recoveryPayload);
 
     if (recoveryError) {
       setError(recoveryError.message);

@@ -126,62 +126,74 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setError(null);
+  setSaving(true);
+  setError(null);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setError("Not logged in"); setSaving(false); return; }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    const { data: logData, error: logError } = await supabase
-      .from("workout_logs")
-      .insert({
-        user_id: session.user.id,
-        workout_type: cycleStep,
-        logged_at: date,
-        duration: parseInt(duration) || 0,
-        effort: effort ? parseInt(effort) : null,
-        notes: notes.trim() || null,
-        advances_cycle: true,
-      })
-      .select()
-      .single();
+  if (!session) {
+    setError("Not logged in");
+    setSaving(false);
+    return;
+  }
 
-    if (logError || !logData) {
-      setError(logError?.message ?? "Failed to save workout");
+  const workoutPayload = {
+    user_id: session.user.id,
+    workout_type: cycleStep,
+    logged_at: date,
+    duration: parseInt(duration) || 0,
+    effort: effort ? parseInt(effort) : null,
+    notes: notes.trim() || null,
+    advances_cycle: true,
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: logData, error: logError } = await (supabase.from("workout_logs") as any)
+    .insert(workoutPayload)
+    .select()
+    .single();
+
+  if (logError || !logData) {
+    setError(logError?.message ?? "Failed to save workout");
+    setSaving(false);
+    return;
+  }
+
+  const setsToInsert: StrengthExerciseInsert[] = [];
+
+  for (const ex of template.exercises) {
+    exerciseSets[ex.name].forEach((row, i) => {
+      if (!row.reps && !row.weight) return;
+
+      setsToInsert.push({
+        workout_log_id: logData.id,
+        exercise_name: ex.name,
+        set_number: i + 1,
+        reps: row.reps ? parseInt(row.reps) : null,
+        weight: row.weight ? parseFloat(row.weight) : null,
+        unit: row.unit,
+        perceived_difficulty: row.perceived_difficulty || null,
+        notes: row.notes.trim() || null,
+      });
+    });
+  }
+
+  if (setsToInsert.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: setsError } = await (supabase.from("strength_exercises") as any)
+      .insert(setsToInsert);
+
+    if (setsError) {
+      setError(setsError.message);
       setSaving(false);
       return;
     }
+  }
 
-    const setsToInsert: StrengthExerciseInsert[] = [];
-    for (const ex of template.exercises) {
-      exerciseSets[ex.name].forEach((row, i) => {
-        if (!row.reps && !row.weight) return;
-        setsToInsert.push({
-          workout_log_id: logData.id,
-          exercise_name: ex.name,
-          set_number: i + 1,
-          reps: row.reps ? parseInt(row.reps) : null,
-          weight: row.weight ? parseFloat(row.weight) : null,
-          unit: row.unit,
-          perceived_difficulty: row.perceived_difficulty || null,
-          notes: row.notes.trim() || null,
-        });
-      });
-    }
-
-    if (setsToInsert.length > 0) {
-      const { error: setsError } = await supabase
-        .from("strength_exercises")
-        .insert(setsToInsert);
-      if (setsError) {
-        setError(setsError.message);
-        setSaving(false);
-        return;
-      }
-    }
-
-    onDone();
-  };
+  onDone();
+};
 
   const EMOJI: Record<string, string> = { A: "💪", B: "🏋️", C: "🔥" };
 
