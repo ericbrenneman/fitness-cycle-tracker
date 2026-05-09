@@ -194,11 +194,26 @@ export default function DashboardPage() {
               <p className="text-muted text-xs mt-1">Tap the button above to get started.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              {logs.map((log) => (
-                <WorkoutCard key={log.id} log={log} />
-              ))}
-            </div>
+  <div className="flex flex-col gap-2">
+    {logs.slice(0, 7).map((log) => (
+      <div
+        key={log.id}
+        className="bg-surface border border-border rounded-2xl p-4"
+      >
+        <p className="text-sm font-semibold text-white">
+          {log.workout_type ?? "Unknown workout"}
+        </p>
+        <p className="text-xs text-muted">
+          {log.logged_at} • {log.duration ?? 0} min
+        </p>
+        {log.notes && (
+          <p className="text-xs text-muted mt-1">
+            {log.notes}
+          </p>
+        )}
+      </div>
+    ))}
+  </div>
           )}
         </div>
       </div>
