@@ -58,10 +58,23 @@ const STEP_META: Record<
   },
 };
 
+function getLogSortTime(log: WorkoutLog): number {
+  const loggedAtTime = new Date(log.logged_at).getTime();
+
+  const createdAt =
+    "created_at" in log && log.created_at
+      ? new Date(String(log.created_at)).getTime()
+      : 0;
+
+  if (Number.isNaN(loggedAtTime)) {
+    return createdAt || 0;
+  }
+
+  return loggedAtTime + createdAt / 10000000000000;
+}
+
 function getLastCycleStep(logs: WorkoutLog[]): CycleStep | null {
-  const sorted = [...logs].sort(
-    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
-  );
+  const sorted = [...logs].sort((a, b) => getLogSortTime(a) - getLogSortTime(b));
 
   let lastStep: CycleStep | null = null;
 
@@ -139,19 +152,7 @@ function wasAnythingLoggedToday(logs: WorkoutLog[]): boolean {
 
 export default function NextWorkout({ logs }: { logs: WorkoutLog[] }) {
   const lastCycleStep = getLastCycleStep(logs);
-  const nextStep = getNextStep(lastCycleStep);
-  console.log("[NextWorkout debug]", {
-    totalLogs: logs.length,
-    lastCycleStep,
-    nextStep,
-    latestFive: logs.slice(0, 5).map((log) => ({
-      workout_type: log.workout_type,
-      advances_cycle: log.advances_cycle,
-      logged_at: log.logged_at,
-      created_at: "created_at" in log ? log.created_at : null,
-    })),
-  });
-  
+  const nextStep = getNextStep(lastCycleStep);  
   const meta = STEP_META[nextStep];
   const nextIdx = CYCLE_SEQUENCE.indexOf(nextStep);
   const daysSinceLast = getDaysSince(logs);
@@ -160,7 +161,7 @@ export default function NextWorkout({ logs }: { logs: WorkoutLog[] }) {
   return (
     <div className="bg-surface border border-border rounded-2xl p-4">
       <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-        Next Up DEBUG
+        Next Up
       </p>
 
       <div className="flex items-center gap-3 mb-4">
