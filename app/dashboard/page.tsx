@@ -74,8 +74,9 @@ export default function DashboardPage() {
     if (!session) return "Not logged in";
 
     const { error } = await supabase
-      .from("workout_logs")
-      .insert({
+    .from("workout_logs")
+    .insert([
+      {
         workout_type: entry.workout_type,
         duration: entry.duration,
         effort: entry.effort,
@@ -83,7 +84,8 @@ export default function DashboardPage() {
         advances_cycle: entry.advances_cycle,
         logged_at: entry.logged_at,
         user_id: session.user.id,
-      });
+      },
+    ] as never[]);
 
     if (!error) {
       await fetchLogs();
