@@ -245,16 +245,16 @@ function DetailView({
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase
-      .from("workout_logs")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("workout_logs") as any)
       .update({
         logged_at: editDate,
         duration: parseInt(editDuration) || 0,
         effort: editEffort ? parseInt(editEffort) : null,
-        notes: editNotes.trim() || null,
-        advances_cycle: editAdvances,
+        notes: editNotes || null,
+        advances_cycle: editAdvancesCycle,
       })
-      .eq("id", log.id);
+      .eq("id", editingLog.id);
     setSaving(false);
     if (!error) {
       setEditing(false);
