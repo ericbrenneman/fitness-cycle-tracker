@@ -35,41 +35,79 @@ const TYPE_LABELS: Record<string, string> = {
   Other: "Other",
 };
 
-async function fetchAllLogs(supabase: ReturnType<typeof createClient>, userId: string): Promise<WorkoutLogFull[]> {
-  const { data: logsData } = await supabase
-    .from("workout_logs")
+async function fetchAllLogs(
+  supabase: ReturnType<typeof createClient>,
+  userId: string
+): Promise<WorkoutLogFull[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: logsData, error: logsError } = await (supabase.from("workout_logs") as any)
     .select("*")
     .eq("user_id", userId)
     .order("logged_at", { ascending: false })
     .limit(100);
 
-  if (!logsData) return [];
+  if (logsError) {
+    console.error("[history workout_logs error]", logsError);
+    return [];
+  }
 
-  const logIds = logsData.map((l: WorkoutLog) => l.id);
+  if (!logsData || logsData.length === 0) return [];
+
+  const logs = logsData as WorkoutLog[];
+  const logIds = logs.map((l) => l.id);
 
   const [strengthRes, cardioRes, recoveryRes] = await Promise.all([
-    supabase.from("strength_exercises").select("*").in("workout_log_id", logIds),
-    supabase.from("cardio_details").select("*").in("workout_log_id", logIds),
-    supabase.from("recovery_details").select("*").in("workout_log_id", logIds),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from("strength_exercises") as any)
+      .select("*")
+      .in("workout_log_id", logIds),
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from("cardio_details") as any)
+      .select("*")
+      .in("workout_log_id", logIds),
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from("recovery_details") as any)
+      .select("*")
+      .in("workout_log_id", logIds),
   ]);
 
+  if (strengthRes.error) {
+    console.error("[history strength_exercises error]", strengthRes.error);
+  }
+
+  if (cardioRes.error) {
+    console.error("[history cardio_details error]", cardioRes.error);
+  }
+
+  if (recoveryRes.error) {
+    console.error("[history recovery_details error]", recoveryRes.error);
+  }
+
   const strengthByLog = new Map<string, StrengthExercise[]>();
+
   for (const s of (strengthRes.data ?? []) as StrengthExercise[]) {
-    if (!strengthByLog.has(s.workout_log_id)) strengthByLog.set(s.workout_log_id, []);
+    if (!strengthByLog.has(s.workout_log_id)) {
+      strengthByLog.set(s.workout_log_id, []);
+    }
+
     strengthByLog.get(s.workout_log_id)!.push(s);
   }
 
   const cardioByLog = new Map<string, CardioDetail>();
+
   for (const c of (cardioRes.data ?? []) as CardioDetail[]) {
     cardioByLog.set(c.workout_log_id, c);
   }
 
   const recoveryByLog = new Map<string, RecoveryDetail>();
+
   for (const r of (recoveryRes.data ?? []) as RecoveryDetail[]) {
     recoveryByLog.set(r.workout_log_id, r);
   }
 
-  return logsData.map((log: WorkoutLog) => ({
+  return logs.map((log) => ({
     ...log,
     strength_exercises: strengthByLog.get(log.id) ?? [],
     cardio_detail: cardioByLog.get(log.id) ?? null,
@@ -156,7 +194,7 @@ export default function HistoryPage() {
           </div>
         ) : (
           logs.map((log) => {
-            const meta = TYPE_META[log.workout_type];
+            const meta = TYPE_META[log.workout_type] ?? TYPE_META.Other;
             const date = new Date(log.logged_at).toLocaleDateString("en-US", {
               weekday: "short", month: "short", day: "numeric",
             });
@@ -174,7 +212,9 @@ export default function HistoryPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-sm">{TYPE_LABELS[log.workout_type]}</span>
+                 <span className="font-semibold text-sm">
+                    {TYPE_LABELS[log.workout_type] ?? log.workout_type}
+                 </span>
                     <span className="text-muted text-xs flex-shrink-0">{date}</span>
                   </div>
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap">
@@ -226,7 +266,7 @@ function DetailView({
   onUpdate: (log: WorkoutLogFull) => void;
   supabase: ReturnType<typeof createClient>;
 }) {
-  const meta = TYPE_META[log.workout_type];
+  const meta = TYPE_META[log.workout_type] ?? TYPE_META.Other;
   const date = new Date(log.logged_at).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -337,7 +377,7 @@ function DetailView({
           <div className="flex items-center gap-3 mb-3">
             <span className="text-3xl">{meta.emoji}</span>
             <div>
-              <p className="font-bold text-base">{TYPE_LABELS[log.workout_type]}</p>
+              <p className="font-bold text-base">{TYPE_LABELS[log.workout_type] ?? log.workout_type}</p>
               <p className="text-muted text-xs mt-0.5">{date}</p>
             </div>
           </div>
