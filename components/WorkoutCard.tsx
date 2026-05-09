@@ -1,48 +1,111 @@
 import { WorkoutLog, WorkoutType } from "@/lib/types";
 
-const TYPE_META: Record<WorkoutType, { emoji: string; color: string }> = {
-  A:        { emoji: "💪", color: "#6c63ff" },
-  B:        { emoji: "🏋️", color: "#a78bfa" },
-  C:        { emoji: "⚡", color: "#f59e0b" },
-  Cardio:   { emoji: "🏃", color: "#ff6584" },
-  Rest:     { emoji: "😴", color: "#2ecc71" },
-  Sauna:    { emoji: "🧖", color: "#f97316" },
-  Mobility: { emoji: "🤸", color: "#06b6d4" },
-  Illness:  { emoji: "🤒", color: "#94a3b8" },
-  Other:    { emoji: "📝", color: "#8b8fa8" },
+const TYPE_META: Record<string, { emoji: string; color: string; label: string }> = {
+  A: {
+    emoji: "💪",
+    color: "#6c63ff",
+    label: "Workout A",
+  },
+  B: {
+    emoji: "🏋️",
+    color: "#a78bfa",
+    label: "Workout B",
+  },
+  C: {
+    emoji: "⚡",
+    color: "#f59e0b",
+    label: "Workout C",
+  },
+  Cardio: {
+    emoji: "🏃",
+    color: "#ff6584",
+    label: "Cardio",
+  },
+  Rest: {
+    emoji: "😴",
+    color: "#2ecc71",
+    label: "Rest",
+  },
+  Sauna: {
+    emoji: "🧖",
+    color: "#f97316",
+    label: "Sauna",
+  },
+  Mobility: {
+    emoji: "🤸",
+    color: "#06b6d4",
+    label: "Mobility",
+  },
+  Illness: {
+    emoji: "🤒",
+    color: "#94a3b8",
+    label: "Illness",
+  },
+  Other: {
+    emoji: "📝",
+    color: "#8b8fa8",
+    label: "Other",
+  },
 };
 
 export default function WorkoutCard({ log }: { log: WorkoutLog }) {
-  const meta = TYPE_META[log.workout_type];
+  const workoutType = log.workout_type as WorkoutType | string;
+  const meta = TYPE_META[workoutType] ?? TYPE_META.Other;
+
   const date = new Date(log.logged_at);
-  const dateStr = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const dateStr = Number.isNaN(date.getTime())
+    ? "Unknown date"
+    : date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
 
   return (
     <div className="bg-surface border border-border rounded-2xl px-4 py-3.5 flex items-start gap-3">
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 mt-0.5"
-        style={{ background: meta.color + "22" }}
+        style={{ background: `${meta.color}22` }}
       >
         {meta.emoji}
       </div>
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-semibold text-sm">{log.workout_type}</span>
-          <span className="text-muted text-xs flex-shrink-0">{dateStr}</span>
+          <span className="font-semibold text-sm">
+            {meta.label}
+          </span>
+
+          <span className="text-muted text-xs flex-shrink-0">
+            {dateStr}
+          </span>
         </div>
-        <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-muted text-xs">{log.duration} min</span>
-          {log.effort !== null && (
-            <span className="text-muted text-xs">RPE {log.effort}/10</span>
+
+        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+          <span className="text-muted text-xs">
+            {log.duration ?? 0} min
+          </span>
+
+          {log.effort !== null && log.effort !== undefined && (
+            <span className="text-muted text-xs">
+              RPE {log.effort}/10
+            </span>
           )}
+
           {log.advances_cycle && (
-            <span className="text-xs font-medium" style={{ color: meta.color }}>
+            <span
+              className="text-xs font-medium"
+              style={{ color: meta.color }}
+            >
               ↑ cycle
             </span>
           )}
         </div>
+
         {log.notes && (
-          <p className="text-muted text-xs mt-1 truncate">{log.notes}</p>
+          <p className="text-muted text-xs mt-1 truncate">
+            {log.notes}
+          </p>
         )}
       </div>
     </div>
