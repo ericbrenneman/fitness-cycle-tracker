@@ -1,18 +1,9 @@
-import { WorkoutLog, WorkoutType } from "@/lib/types";
-
-type CycleStep = "A" | "Cardio1" | "B" | "Cardio2" | "C" | "Rest1" | "Rest2";
-
-const CYCLE_SEQUENCE: CycleStep[] = [
-  "A",
-  "Cardio1",
-  "B",
-  "Cardio2",
-  "C",
-  "Rest1",
-  "Rest2",
-];
-
-const REST_TYPES: WorkoutType[] = ["Rest", "Sauna", "Mobility", "Illness", "Other"];
+import {
+  WorkoutLog,
+  WorkoutType,
+  CycleStep,
+  CYCLE_SEQUENCE,
+} from "@/lib/types";
 
 const STEP_META: Record<
   CycleStep,
@@ -67,14 +58,37 @@ const STEP_META: Record<
   },
 };
 
-function getLogTime(log: WorkoutLog): number {
-  const loggedAtTime = new Date(log.logged_at).getTime();
-  const createdAt = "created_at" in log ? log.created_at : null;
-  const createdAtTime = createdAt ? new Date(String(createdAt)).getTime() : 0;
+function getLastCycleStep(logs: WorkoutLog[]): CycleStep | null {
+  const sorted = [...logs].sort(
+    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
+  );
 
-  if (Number.isNaN(loggedAtTime)) return createdAtTime || 0;
+  let lastStep: CycleStep | null = null;
 
-  return loggedAtTime + createdAtTime / 10000000000000;
+  for (const log of sorted) {
+    if (!log.advances_cycle) continue;
+
+    if (log.workout_type === "A") {
+      lastStep = "A";
+    } else if (log.workout_type === "Cardio") {
+      lastStep = lastStep === "A" ? "Cardio1" : "Cardio2";
+    } else if (log.workout_type === "B") {
+      lastStep = "B";
+    } else if (log.workout_type === "C") {
+      lastStep = "C";
+    } else if (
+      log.workout_type === "Rest" ||
+      log.workout_type === "Sauna" ||
+      log.workout_type === "Mobility" ||
+      log.workout_type === "Illness" ||
+      log.workout_type === "Other"
+    ) {
+      if (lastStep === "C") lastStep = "Rest1";
+      else if (lastStep === "Rest1") lastStep = "Rest2";
+    }
+  }
+
+  return lastStep;
 }
 
 function getNextStep(lastStep: CycleStep | null): CycleStep {
@@ -87,55 +101,13 @@ function getNextStep(lastStep: CycleStep | null): CycleStep {
   return CYCLE_SEQUENCE[(idx + 1) % CYCLE_SEQUENCE.length];
 }
 
-function inferStepFromLog(log: WorkoutLog, lastStep: CycleStep | null): CycleStep | null {
-  if (!log.advances_cycle) return null;
-
-  const expectedNext = getNextStep(lastStep);
-
-  if (log.workout_type === "A") return "A";
-  if (log.workout_type === "B") return "B";
-  if (log.workout_type === "C") return "C";
-
-  if (log.workout_type === "Cardio") {
-    if (expectedNext === "Cardio1") return "Cardio1";
-    if (expectedNext === "Cardio2") return "Cardio2";
-
-    return lastStep === "A" ? "Cardio1" : "Cardio2";
-  }
-
-  if (REST_TYPES.includes(log.workout_type)) {
-    if (expectedNext === "Rest1") return "Rest1";
-    if (expectedNext === "Rest2") return "Rest2";
-
-    if (lastStep === "C") return "Rest1";
-    if (lastStep === "Rest1") return "Rest2";
-  }
-
-  return null;
-}
-
-function getLastCycleStep(logs: WorkoutLog[]): CycleStep | null {
-  const sorted = [...logs]
-    .filter((log) => log.advances_cycle)
-    .sort((a, b) => getLogTime(a) - getLogTime(b));
-
-  let lastStep: CycleStep | null = null;
-
-  for (const log of sorted) {
-    const inferredStep = inferStepFromLog(log, lastStep);
-
-    if (inferredStep) {
-      lastStep = inferredStep;
-    }
-  }
-
-  return lastStep;
-}
-
 function getDaysSince(logs: WorkoutLog[]): number | null {
   if (!logs[0]) return null;
 
-  const sortedNewestFirst = [...logs].sort((a, b) => getLogTime(b) - getLogTime(a));
+  const sortedNewestFirst = [...logs].sort(
+    (a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime()
+  );
+
   const latestLog = sortedNewestFirst[0];
 
   if (!latestLog?.logged_at) return null;
