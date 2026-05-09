@@ -25,17 +25,22 @@ export async function loadUserTemplate(
   userId: string,
   workoutType: "A" | "B" | "C"
 ): Promise<UserTemplate | null> {
-  const { data, error } = await supabase
-    .from("user_templates")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from("user_templates") as any)
     .select("*")
     .eq("user_id", userId)
     .eq("workout_type", workoutType)
     .single();
 
   if (error || !data) return null;
+
+  const row = data as {
+    exercises: UserExercise[];
+  };
+
   return {
     workout_type: workoutType,
-    exercises: data.exercises as UserExercise[],
+    exercises: row.exercises,
   };
 }
 
@@ -47,8 +52,8 @@ export async function loadAllUserTemplates(
   supabase: ReturnType<typeof createClient>,
   userId: string
 ): Promise<Record<"A" | "B" | "C", WorkoutTemplate>> {
-  const { data } = await supabase
-    .from("user_templates")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase.from("user_templates") as any)
     .select("*")
     .eq("user_id", userId);
 
@@ -60,11 +65,17 @@ export async function loadAllUserTemplates(
 
   if (!data) return result;
 
-  for (const row of data) {
-    const type = row.workout_type as "A" | "B" | "C";
+  const rows = data as Array<{
+    workout_type: "A" | "B" | "C";
+    exercises: ExerciseTemplate[];
+  }>;
+
+  for (const row of rows) {
+    const type = row.workout_type;
+
     result[type] = {
       ...STRENGTH_TEMPLATES[type],
-      exercises: row.exercises as ExerciseTemplate[],
+      exercises: row.exercises,
     };
   }
 
@@ -81,14 +92,16 @@ export async function saveUserTemplate(
   workoutType: "A" | "B" | "C",
   exercises: UserExercise[]
 ): Promise<string | null> {
-  const { error } = await supabase
-    .from("user_templates")
-    .upsert({
-      user_id: userId,
-      workout_type: workoutType,
-      exercises,
-      updated_at: new Date().toISOString(),
-    }, {
+  const payload = {
+    user_id: userId,
+    workout_type: workoutType,
+    exercises,
+    updated_at: new Date().toISOString(),
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from("user_templates") as any)
+    .upsert(payload, {
       onConflict: "user_id,workout_type",
     });
 
@@ -103,8 +116,8 @@ export async function resetUserTemplate(
   userId: string,
   workoutType: "A" | "B" | "C"
 ): Promise<string | null> {
-  const { error } = await supabase
-    .from("user_templates")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from("user_templates") as any)
     .delete()
     .eq("user_id", userId)
     .eq("workout_type", workoutType);
