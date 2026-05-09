@@ -150,7 +150,7 @@
           }
 
           return (
-            <div className="flex flex-col flex-1 pb-6">
+            <div className="flex flex-col flex-1 pb-28">
               <div className="flex items-center justify-between px-4 pt-10 pb-6">
                 <div>
                   <p className="text-muted text-xs mb-0.5">
