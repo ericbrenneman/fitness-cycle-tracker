@@ -78,7 +78,11 @@ export default function WorkoutPage() {
       setUserTemplates(templates);
 
       const lastStep = getLastCycleStep(fetchedLogs);
-      setNextStep(getNextStep(lastStep));
+      const next = getNextStep(lastStep);
+      console.log("[workout] fetchedLogs count:", fetchedLogs.length);
+      console.log("[workout] lastStep:", lastStep);
+      console.log("[workout] nextStep:", next);
+      setNextStep(next);
       setLoading(false);
     };
     init();
