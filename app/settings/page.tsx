@@ -3,21 +3,23 @@
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { STRENGTH_TEMPLATES } from "@/lib/templates";
+import { STRENGTH_TEMPLATES, TRAVEL_TEMPLATES } from "@/lib/templates";
 import {
   loadAllUserTemplates,
   saveUserTemplate,
   resetUserTemplate,
+  loadWorkoutMode,
   UserExercise,
+  WorkoutMode,
 } from "@/lib/userTemplates";
 import { WorkoutTemplate } from "@/lib/types";
 
 const WORKOUT_TYPES: ("A" | "B" | "C")[] = ["A", "B", "C"];
 
 const TYPE_META = {
-  A: { emoji: "💪", label: "Workout A — Push + Legs" },
-  B: { emoji: "🏋️", label: "Workout B — Pull + Hinge" },
-  C: { emoji: "🔥", label: "Workout C — Full Body" },
+  A: { emoji: "💪", label: "Workout A" },
+  B: { emoji: "🏋️", label: "Workout B" },
+  C: { emoji: "🔥", label: "Workout C" },
 };
 
 export default function SettingsPage() {
@@ -27,16 +29,16 @@ export default function SettingsPage() {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [templates, setTemplates] = useState<Record<"A" | "B" | "C", WorkoutTemplate> | null>(null);
   const [activeTab, setActiveTab] = useState<"A" | "B" | "C">("A");
+  const [activeMode, setActiveMode] = useState<WorkoutMode>("home");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
-  // Editable exercises for each workout type
-  const [exercises, setExercises] = useState<Record<"A" | "B" | "C", UserExercise[]>>({
-    A: [],
-    B: [],
-    C: [],
+  const [homeExercises, setHomeExercises] = useState<Record<"A" | "B" | "C", UserExercise[]>>({
+    A: [], B: [], C: [],
+  });
+  const [travelExercises, setTravelExercises] = useState<Record<"A" | "B" | "C", UserExercise[]>>({
+    A: [], B: [], C: [],
   });
 
   useEffect(() => {
@@ -45,19 +47,32 @@ export default function SettingsPage() {
       if (!session) { router.push("/auth"); return; }
       setUserId(session.user.id);
 
-      const loaded = await loadAllUserTemplates(supabase, session.user.id);
-      setTemplates(loaded);
+      const [homeLoaded, travelLoaded, currentMode] = await Promise.all([
+        loadAllUserTemplates(supabase, session.user.id, "home"),
+        loadAllUserTemplates(supabase, session.user.id, "travel"),
+        loadWorkoutMode(supabase, session.user.id),
+      ]);
 
-      setExercises({
-        A: loaded.A.exercises.map(ex => ({ ...ex })),
-        B: loaded.B.exercises.map(ex => ({ ...ex })),
-        C: loaded.C.exercises.map(ex => ({ ...ex })),
+      setHomeExercises({
+        A: homeLoaded.A.exercises.map(ex => ({ ...ex })),
+        B: homeLoaded.B.exercises.map(ex => ({ ...ex })),
+        C: homeLoaded.C.exercises.map(ex => ({ ...ex })),
       });
 
+      setTravelExercises({
+        A: travelLoaded.A.exercises.map(ex => ({ ...ex })),
+        B: travelLoaded.B.exercises.map(ex => ({ ...ex })),
+        C: travelLoaded.C.exercises.map(ex => ({ ...ex })),
+      });
+
+      setActiveMode(currentMode);
       setLoading(false);
     };
     init();
   }, []);
+
+  const exercises = activeMode === "home" ? homeExercises : travelExercises;
+  const setExercises = activeMode === "home" ? setHomeExercises : setTravelExercises;
 
   const updateExercise = (
     type: "A" | "B" | "C",
@@ -75,17 +90,14 @@ export default function SettingsPage() {
   const addExercise = (type: "A" | "B" | "C") => {
     setExercises((prev) => ({
       ...prev,
-      [type]: [
-        ...prev[type],
-        {
-          name: "",
-          default_sets: 3,
-          default_reps_range: [8, 12] as [number, number],
-          timed: false,
-          optional: false,
-          notes: "",
-        },
-      ],
+      [type]: [...prev[type], {
+        name: "",
+        default_sets: 3,
+        default_reps_range: [8, 12] as [number, number],
+        timed: false,
+        optional: false,
+        notes: "",
+      }],
     }));
   };
 
@@ -110,7 +122,7 @@ export default function SettingsPage() {
     if (!userId) return;
     setSaving(true);
     setSaveMsg(null);
-    const err = await saveUserTemplate(supabase, userId, type, exercises[type]);
+    const err = await saveUserTemplate(supabase, userId, type, exercises[type], activeMode);
     setSaving(false);
     setSaveMsg(err ? `Error: ${err}` : "Saved ✓");
     setTimeout(() => setSaveMsg(null), 2000);
@@ -118,8 +130,10 @@ export default function SettingsPage() {
 
   const handleReset = async (type: "A" | "B" | "C") => {
     if (!userId) return;
-    await resetUserTemplate(supabase, userId, type);
-    const defaults = STRENGTH_TEMPLATES[type].exercises.map(ex => ({ ...ex }));
+    await resetUserTemplate(supabase, userId, type, activeMode);
+    const defaults = activeMode === "travel"
+      ? TRAVEL_TEMPLATES[type].exercises.map(ex => ({ ...ex }))
+      : STRENGTH_TEMPLATES[type].exercises.map(ex => ({ ...ex }));
     setExercises((prev) => ({ ...prev, [type]: defaults }));
     setSaveMsg("Reset to default ✓");
     setTimeout(() => setSaveMsg(null), 2000);
@@ -135,23 +149,34 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col flex-1 pb-24">
-      <div className="flex items-center justify-between px-4 pt-10 pb-6">
-        <div>
-          <h1 className="text-xl font-bold">Settings</h1>
-          <p className="text-muted text-xs mt-0.5">Customize your workout templates</p>
-        </div>
+      <div className="px-4 pt-10 pb-4">
+        <h1 className="text-xl font-bold">Settings</h1>
+        <p className="text-muted text-xs mt-0.5">Customize your workout templates</p>
       </div>
 
-      {/* Tabs */}
+      {/* Home / Travel mode selector */}
+      <div className="flex gap-1 mx-4 mb-3 bg-surface border border-border rounded-xl p-1">
+        {(["home", "travel"] as WorkoutMode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setActiveMode(m)}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeMode === m ? "bg-accent text-white" : "text-muted hover:text-white"
+            }`}
+          >
+            {m === "home" ? "🏠 Home" : "✈️ Travel"}
+          </button>
+        ))}
+      </div>
+
+      {/* Workout type tabs */}
       <div className="flex gap-1 mx-4 mb-4 bg-surface border border-border rounded-xl p-1">
         {WORKOUT_TYPES.map((type) => (
           <button
             key={type}
             onClick={() => setActiveTab(type)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === type
-                ? "bg-accent text-white"
-                : "text-muted hover:text-white"
+              activeTab === type ? "bg-accent text-white" : "text-muted hover:text-white"
             }`}
           >
             {TYPE_META[type].emoji} {type}
@@ -162,110 +187,69 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-3 px-4">
         <div className="bg-surface border border-border rounded-2xl p-4">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
-            {TYPE_META[activeTab].label}
+            {activeMode === "travel" ? "✈️ Travel" : "🏠 Home"} — {TYPE_META[activeTab].label}
           </p>
           <p className="text-xs text-muted mb-4">
-            Customize the exercises for this workout. Changes only affect your account.
+            {activeMode === "travel"
+              ? "Hotel / bodyweight exercises. Used when Travel Mode is active."
+              : "Gym exercises. Used when Home Mode is active."}
           </p>
 
-          {/* Exercise list */}
           <div className="flex flex-col gap-3">
             {exercises[activeTab].map((ex, idx) => (
-              <div
-                key={idx}
-                className="bg-card border border-border rounded-xl p-3 flex flex-col gap-2"
-              >
-                {/* Exercise name */}
+              <div key={idx} className="bg-card border border-border rounded-xl p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <div className="flex flex-col gap-0.5">
-                    <button
-                      onClick={() => moveExercise(activeTab, idx, -1)}
-                      disabled={idx === 0}
-                      className="text-muted hover:text-white disabled:opacity-20 text-xs leading-none"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      onClick={() => moveExercise(activeTab, idx, 1)}
-                      disabled={idx === exercises[activeTab].length - 1}
-                      className="text-muted hover:text-white disabled:opacity-20 text-xs leading-none"
-                    >
-                      ▼
-                    </button>
+                    <button onClick={() => moveExercise(activeTab, idx, -1)} disabled={idx === 0}
+                      className="text-muted hover:text-white disabled:opacity-20 text-xs leading-none">▲</button>
+                    <button onClick={() => moveExercise(activeTab, idx, 1)} disabled={idx === exercises[activeTab].length - 1}
+                      className="text-muted hover:text-white disabled:opacity-20 text-xs leading-none">▼</button>
                   </div>
-                  <input
-                    type="text"
-                    value={ex.name}
+                  <input type="text" value={ex.name}
                     onChange={(e) => updateExercise(activeTab, idx, "name", e.target.value)}
                     placeholder="Exercise name"
-                    className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
-                  />
-                  <button
-                    onClick={() => removeExercise(activeTab, idx)}
-                    className="text-red-400/60 hover:text-red-400 text-xs px-2"
-                  >
-                    ✕
-                  </button>
+                    className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent" />
+                  <button onClick={() => removeExercise(activeTab, idx)}
+                    className="text-red-400/60 hover:text-red-400 text-xs px-2">✕</button>
                 </div>
 
-                {/* Sets + reps */}
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-xs text-muted mb-1">Sets</label>
-                    <input
-                      type="number"
-                      value={ex.default_sets}
+                    <input type="number" value={ex.default_sets}
                       onChange={(e) => updateExercise(activeTab, idx, "default_sets", parseInt(e.target.value) || 3)}
-                      className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent text-center"
-                    />
+                      className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent text-center" />
                   </div>
                   <div>
                     <label className="block text-xs text-muted mb-1">Reps min</label>
-                    <input
-                      type="number"
-                      value={ex.default_reps_range[0]}
+                    <input type="number" value={ex.default_reps_range[0]}
                       onChange={(e) => updateExercise(activeTab, idx, "default_reps_range", [parseInt(e.target.value) || 8, ex.default_reps_range[1]])}
-                      className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent text-center"
-                    />
+                      className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent text-center" />
                   </div>
                   <div>
                     <label className="block text-xs text-muted mb-1">Reps max</label>
-                    <input
-                      type="number"
-                      value={ex.default_reps_range[1]}
+                    <input type="number" value={ex.default_reps_range[1]}
                       onChange={(e) => updateExercise(activeTab, idx, "default_reps_range", [ex.default_reps_range[0], parseInt(e.target.value) || 12])}
-                      className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent text-center"
-                    />
+                      className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent text-center" />
                   </div>
                 </div>
 
-                {/* Notes */}
-                <input
-                  type="text"
-                  value={ex.notes}
+                <input type="text" value={ex.notes}
                   onChange={(e) => updateExercise(activeTab, idx, "notes", e.target.value)}
                   placeholder="Notes / cues (optional)"
-                  className="w-full bg-surface border border-border rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-accent"
-                />
+                  className="w-full bg-surface border border-border rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-accent" />
 
-                {/* Toggles */}
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ex.timed}
+                    <input type="checkbox" checked={ex.timed}
                       onChange={(e) => updateExercise(activeTab, idx, "timed", e.target.checked)}
-                      className="accent-[#6c63ff]"
-                    />
+                      className="accent-[#6c63ff]" />
                     <span className="text-xs text-muted">Timed (seconds)</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ex.optional}
+                    <input type="checkbox" checked={ex.optional}
                       onChange={(e) => updateExercise(activeTab, idx, "optional", e.target.checked)}
-                      className="accent-[#6c63ff]"
-                    />
+                      className="accent-[#6c63ff]" />
                     <span className="text-xs text-muted">Optional</span>
                   </label>
                 </div>
@@ -273,28 +257,19 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          {/* Add exercise */}
-          <button
-            onClick={() => addExercise(activeTab)}
-            className="w-full mt-3 border border-dashed border-border rounded-xl py-3 text-sm text-muted hover:text-white hover:border-accent/50 transition-colors"
-          >
+          <button onClick={() => addExercise(activeTab)}
+            className="w-full mt-3 border border-dashed border-border rounded-xl py-3 text-sm text-muted hover:text-white hover:border-accent/50 transition-colors">
             + Add Exercise
           </button>
         </div>
 
-        {/* Save / Reset */}
         <div className="flex gap-2">
-          <button
-            onClick={() => handleSave(activeTab)}
-            disabled={saving}
-            className="flex-1 bg-accent text-white font-semibold py-3 rounded-2xl text-sm disabled:opacity-50 hover:bg-accent/90 transition-colors"
-          >
-            {saving ? "Saving…" : "Save Workout " + activeTab}
+          <button onClick={() => handleSave(activeTab)} disabled={saving}
+            className="flex-1 bg-accent text-white font-semibold py-3 rounded-2xl text-sm disabled:opacity-50 hover:bg-accent/90 transition-colors">
+            {saving ? "Saving…" : `Save ${activeMode === "travel" ? "✈️" : "🏠"} Workout ${activeTab}`}
           </button>
-          <button
-            onClick={() => handleReset(activeTab)}
-            className="border border-border text-muted text-sm font-medium px-4 py-3 rounded-2xl hover:text-white hover:border-accent/50 transition-colors"
-          >
+          <button onClick={() => handleReset(activeTab)}
+            className="border border-border text-muted text-sm font-medium px-4 py-3 rounded-2xl hover:text-white hover:border-accent/50 transition-colors">
             Reset
           </button>
         </div>

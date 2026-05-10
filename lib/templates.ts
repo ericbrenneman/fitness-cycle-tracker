@@ -225,3 +225,157 @@ export function getAllExerciseNames(): string[] {
   );
   return Array.from(names);
 }
+
+// ============================================================
+// TRAVEL TEMPLATES — Hotel / Bodyweight
+// ============================================================
+
+export const TRAVEL_WORKOUT_A: WorkoutTemplate = {
+  cycle_step: "A",
+  name: "Travel A — Lower Body Bodyweight",
+  description: "Glutes, quads, and core — no equipment needed.",
+  exercises: [
+    {
+      name: "Bodyweight Squats",
+      default_sets: 3,
+      default_reps_range: [15, 20],
+      timed: false,
+      optional: false,
+      notes: "Slow and controlled. Pause at bottom.",
+    },
+    {
+      name: "Reverse Lunges",
+      default_sets: 3,
+      default_reps_range: [10, 12],
+      timed: false,
+      optional: false,
+      notes: "Per leg. Keep front knee over ankle.",
+    },
+    {
+      name: "Glute Bridge",
+      default_sets: 3,
+      default_reps_range: [15, 20],
+      timed: false,
+      optional: false,
+      notes: "Squeeze at top. Can elevate feet on bed.",
+    },
+    {
+      name: "Plank",
+      default_sets: 3,
+      default_reps_range: [30, 60],
+      timed: true,
+      optional: false,
+      notes: "Hold 30–60 seconds. Neutral spine.",
+    },
+    {
+      name: "Wall Sit",
+      default_sets: 3,
+      default_reps_range: [30, 60],
+      timed: true,
+      optional: true,
+      notes: "Optional burnout. 30–60 seconds.",
+    },
+  ],
+};
+
+export const TRAVEL_WORKOUT_B: WorkoutTemplate = {
+  cycle_step: "B",
+  name: "Travel B — Upper Body Bodyweight",
+  description: "Push, pull, and core — minimal equipment.",
+  exercises: [
+    {
+      name: "Push-Ups",
+      default_sets: 3,
+      default_reps_range: [10, 15],
+      timed: false,
+      optional: false,
+      notes: "Full range. Elevate hands to modify.",
+    },
+    {
+      name: "Pike Push-Ups",
+      default_sets: 3,
+      default_reps_range: [8, 12],
+      timed: false,
+      optional: false,
+      notes: "Hips high. Works shoulders.",
+    },
+    {
+      name: "Superman Hold",
+      default_sets: 3,
+      default_reps_range: [10, 12],
+      timed: false,
+      optional: false,
+      notes: "Lie face down. Lift arms and legs. Hold 2 sec.",
+    },
+    {
+      name: "Dead Bug",
+      default_sets: 3,
+      default_reps_range: [8, 10],
+      timed: false,
+      optional: false,
+      notes: "Per side. Slow and controlled. Lower back flat.",
+    },
+    {
+      name: "Towel Row (door)",
+      default_sets: 3,
+      default_reps_range: [10, 15],
+      timed: false,
+      optional: true,
+      notes: "Optional. Loop towel around door handle. Lean back and row.",
+    },
+  ],
+};
+
+export const TRAVEL_WORKOUT_C: WorkoutTemplate = {
+  cycle_step: "C",
+  name: "Travel C — Full Body Conditioning",
+  description: "Athletic full-body circuit. Gets the heart rate up.",
+  exercises: [
+    {
+      name: "Jump Squats",
+      default_sets: 3,
+      default_reps_range: [10, 15],
+      timed: false,
+      optional: false,
+      notes: "Land soft. Modify to bodyweight squat if needed.",
+    },
+    {
+      name: "Push-Up to Down Dog",
+      default_sets: 3,
+      default_reps_range: [8, 10],
+      timed: false,
+      optional: false,
+      notes: "Push-up then pike into down dog. Fluid movement.",
+    },
+    {
+      name: "Step-Ups (chair or bed)",
+      default_sets: 3,
+      default_reps_range: [10, 12],
+      timed: false,
+      optional: false,
+      notes: "Per leg. Use a sturdy chair or low bed.",
+    },
+    {
+      name: "Mountain Climbers",
+      default_sets: 3,
+      default_reps_range: [20, 30],
+      timed: false,
+      optional: false,
+      notes: "Per leg. Keep hips low and core tight.",
+    },
+    {
+      name: "Hollow Hold",
+      default_sets: 3,
+      default_reps_range: [20, 40],
+      timed: true,
+      optional: false,
+      notes: "Lower back pressed to floor. Arms overhead.",
+    },
+  ],
+};
+
+export const TRAVEL_TEMPLATES: Record<"A" | "B" | "C", WorkoutTemplate> = {
+  A: TRAVEL_WORKOUT_A,
+  B: TRAVEL_WORKOUT_B,
+  C: TRAVEL_WORKOUT_C,
+};

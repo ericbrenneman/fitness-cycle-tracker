@@ -10,6 +10,7 @@ interface Props {
   template: WorkoutTemplate;
   pastLogs: WorkoutLog[];
   onDone: () => void;
+  mode?: "home" | "travel";
 }
 
 interface SetRow {
@@ -155,7 +156,7 @@ function RestTimer({
 // ============================================================
 // Main StrengthLogger
 // ============================================================
-export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }: Props) {
+export default function StrengthLogger({ cycleStep, template, pastLogs, onDone, mode = "home" }: Props) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
@@ -342,7 +343,9 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone }
 
       <div className="flex items-center justify-between px-4 pt-10 pb-4">
         <div>
-          <p className="text-muted text-xs mb-0.5">Starting workout</p>
+          <p className="text-muted text-xs mb-0.5">
+            {mode === "travel" ? "✈️ Travel workout" : "Starting workout"}
+          </p>
           <h1 className="text-xl font-bold">
             {EMOJI[cycleStep]} {template.name}
           </h1>
