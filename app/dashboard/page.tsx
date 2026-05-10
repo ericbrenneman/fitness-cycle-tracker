@@ -35,7 +35,7 @@ export default function DashboardPage() {
       .eq("user_id", session.user.id)
       .order("logged_at", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (error) {
       setDbError(error.message);

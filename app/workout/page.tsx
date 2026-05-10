@@ -63,10 +63,12 @@ export default function WorkoutPage() {
       const [logsRes, currentMode] = await Promise.all([
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase.from("workout_logs") as any)
-          .select("*")
-          .eq("user_id", session.user.id)
-          .order("logged_at", { ascending: false })
-          .limit(50),
+        .select("*")
+        .eq("user_id", session.user.id)
+        .eq("advances_cycle", true)
+        .order("logged_at", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(200),
         loadWorkoutMode(supabase, session.user.id),
       ]);
 
