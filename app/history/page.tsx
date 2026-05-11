@@ -379,12 +379,15 @@ return (
         )}
       </div>
     ) : (
-      <HabitHistory
-        hydrationRows={hydrationRows}
-        alcoholRows={alcoholRows}
-        hydrationGoal={hydrationGoal}
-        alcoholLimit={alcoholLimit}
-      />
+    <HabitHistory
+      hydrationRows={hydrationRows}
+      alcoholRows={alcoholRows}
+      hydrationGoal={hydrationGoal}
+      alcoholLimit={alcoholLimit}
+      supabase={supabase}
+      userId={userId}
+      onRefresh={reload}
+    />
     )}
   </div>
 );
@@ -723,131 +726,353 @@ function DetailView({
     return `${formatLocalDate(weekStart)} – ${formatLocalDate(weekEnd(weekStart))}`;
   }
 
-  function HabitHistory({
-    hydrationRows,
-    alcoholRows,
-    hydrationGoal,
-    alcoholLimit,
-  }: {
-    hydrationRows: HydrationHistoryRow[];
-    alcoholRows: AlcoholHistoryRow[];
-    hydrationGoal: number;
-    alcoholLimit: number;
-  }) {
-    return (
-      <div className="flex flex-col gap-4 px-4">
-        <div>
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-            Hydration
-          </p>
+function HabitHistory({
+  hydrationRows,
+  alcoholRows,
+  hydrationGoal,
+  alcoholLimit,
+  supabase,
+  userId,
+  onRefresh,
+}: {
+  hydrationRows: HydrationHistoryRow[];
+  alcoholRows: AlcoholHistoryRow[];
+  hydrationGoal: number;
+  alcoholLimit: number;
+  supabase: ReturnType<typeof createClient>;
+  userId: string | null;
+  onRefresh: (uid: string) => Promise<void>;
+}) {
+  const [editingHydrationDate, setEditingHydrationDate] = useState<string | null>(null);
+  const [editingHydrationAmount, setEditingHydrationAmount] = useState("");
+  const [editingAlcoholWeek, setEditingAlcoholWeek] = useState<string | null>(null);
+  const [editingAlcoholCount, setEditingAlcoholCount] = useState("");
+  const [savingHabit, setSavingHabit] = useState(false);
 
-          {hydrationRows.length === 0 ? (
-            <div className="bg-surface border border-border rounded-2xl p-5 text-center">
-              <p className="text-muted text-sm">No hydration history yet.</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {hydrationRows.map((row) => {
-                const complete = row.amount_oz >= hydrationGoal;
-                const overBy = row.amount_oz - hydrationGoal;
+  const saveHydration = async (loggedAt: string) => {
+    if (!userId) return;
 
-                return (
-                  <div
-                    key={row.logged_at}
-                    className={`rounded-2xl px-4 py-3.5 border ${
-                      complete
-                        ? "bg-blue-500/10 border-blue-400/30"
-                        : "bg-surface border-border"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold">
-                          💧 {formatLocalDate(row.logged_at)}
-                        </p>
+    const amount = parseInt(editingHydrationAmount);
+    if (Number.isNaN(amount) || amount < 0) return;
+
+    setSavingHabit(true);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("hydration_logs") as any)
+      .update({
+        amount_oz: amount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("logged_at", loggedAt);
+
+    setSavingHabit(false);
+
+    if (!error) {
+      setEditingHydrationDate(null);
+      setEditingHydrationAmount("");
+      await onRefresh(userId);
+    }
+  };
+
+  const deleteHydration = async (loggedAt: string) => {
+    if (!userId) return;
+    if (!window.confirm("Delete this hydration entry?")) return;
+
+    setSavingHabit(true);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("hydration_logs") as any)
+      .delete()
+      .eq("user_id", userId)
+      .eq("logged_at", loggedAt);
+
+    setSavingHabit(false);
+
+    if (!error) {
+      await onRefresh(userId);
+    }
+  };
+
+  const saveAlcohol = async (weekStart: string) => {
+    if (!userId) return;
+
+    const count = parseInt(editingAlcoholCount);
+    if (Number.isNaN(count) || count < 0) return;
+
+    setSavingHabit(true);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("alcohol_logs") as any)
+      .update({
+        drink_count: count,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("week_start", weekStart);
+
+    setSavingHabit(false);
+
+    if (!error) {
+      setEditingAlcoholWeek(null);
+      setEditingAlcoholCount("");
+      await onRefresh(userId);
+    }
+  };
+
+  const deleteAlcohol = async (weekStart: string) => {
+    if (!userId) return;
+    if (!window.confirm("Delete this conscious consumption week?")) return;
+
+    setSavingHabit(true);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("alcohol_logs") as any)
+      .delete()
+      .eq("user_id", userId)
+      .eq("week_start", weekStart);
+
+    setSavingHabit(false);
+
+    if (!error) {
+      await onRefresh(userId);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4 px-4">
+      <div>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+          Hydration
+        </p>
+
+        {hydrationRows.length === 0 ? (
+          <div className="bg-surface border border-border rounded-2xl p-5 text-center">
+            <p className="text-muted text-sm">No hydration history yet.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {hydrationRows.map((row) => {
+              const complete = row.amount_oz >= hydrationGoal;
+              const overBy = row.amount_oz - hydrationGoal;
+              const isEditing = editingHydrationDate === row.logged_at;
+
+              return (
+                <div
+                  key={row.logged_at}
+                  className={`rounded-2xl px-4 py-3.5 border ${
+                    complete
+                      ? "bg-blue-500/10 border-blue-400/30"
+                      : "bg-surface border-border"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">
+                        💧 {formatLocalDate(row.logged_at)}
+                      </p>
+
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 mt-2">
+                          <input
+                            type="number"
+                            value={editingHydrationAmount}
+                            onChange={(e) => setEditingHydrationAmount(e.target.value)}
+                            className="w-24 bg-card border border-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
+                          />
+                          <span className="text-xs text-muted">oz</span>
+                        </div>
+                      ) : (
                         <p className="text-xs text-muted mt-0.5">
                           {row.amount_oz} / {hydrationGoal} oz
                           {complete && overBy > 0
                             ? ` • +${overBy} oz over target`
                             : ""}
                         </p>
-                      </div>
-
-                      {complete ? (
-                        <span className="text-xs font-medium text-blue-300 bg-blue-400/20 px-2 py-1 rounded-full">
-                          Apex Habit ✓
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted">
-                          {Math.max(hydrationGoal - row.amount_oz, 0)} oz short
-                        </span>
                       )}
                     </div>
+
+                    {!isEditing && complete && (
+                      <span className="text-xs font-medium text-blue-300 bg-blue-400/20 px-2 py-1 rounded-full">
+                        Apex Habit ✓
+                      </span>
+                    )}
+
+                    {!isEditing && !complete && (
+                      <span className="text-xs text-muted">
+                        {Math.max(hydrationGoal - row.amount_oz, 0)} oz short
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        <div>
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-            Conscious Consumption
-          </p>
+                  <div className="flex gap-2 mt-3">
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={() => saveHydration(row.logged_at)}
+                          disabled={savingHabit}
+                          className="flex-1 bg-accent text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-50"
+                        >
+                          Save
+                        </button>
 
-          {alcoholRows.length === 0 ? (
-            <div className="bg-surface border border-border rounded-2xl p-5 text-center">
-              <p className="text-muted text-sm">
-                No conscious consumption history yet.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {alcoholRows.map((row) => {
-                const withinLimit = row.drink_count <= alcoholLimit;
-                const overBy = row.drink_count - alcoholLimit;
+                        <button
+                          onClick={() => {
+                            setEditingHydrationDate(null);
+                            setEditingHydrationAmount("");
+                          }}
+                          className="flex-1 bg-surface border border-border text-muted text-xs font-semibold py-2 rounded-xl hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingHydrationDate(row.logged_at);
+                            setEditingHydrationAmount(String(row.amount_oz));
+                          }}
+                          className="flex-1 border border-border text-muted text-xs font-medium py-2 rounded-xl hover:text-white hover:border-accent/50"
+                        >
+                          Edit
+                        </button>
 
-                return (
-                  <div
-                    key={row.week_start}
-                    className={`rounded-2xl px-4 py-3.5 border ${
-                      withinLimit
-                        ? "bg-green-500/10 border-green-400/30"
-                        : "bg-red-500/10 border-red-400/30"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold">
-                          🍃 {formatWeekRange(row.week_start)}
-                        </p>
+                        <button
+                          onClick={() => deleteHydration(row.logged_at)}
+                          disabled={savingHabit}
+                          className="flex-1 border border-red-400/30 text-red-400 text-xs font-medium py-2 rounded-xl hover:bg-red-400/10 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+          Conscious Consumption
+        </p>
+
+        {alcoholRows.length === 0 ? (
+          <div className="bg-surface border border-border rounded-2xl p-5 text-center">
+            <p className="text-muted text-sm">
+              No conscious consumption history yet.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {alcoholRows.map((row) => {
+              const withinLimit = row.drink_count <= alcoholLimit;
+              const overBy = row.drink_count - alcoholLimit;
+              const isEditing = editingAlcoholWeek === row.week_start;
+
+              return (
+                <div
+                  key={row.week_start}
+                  className={`rounded-2xl px-4 py-3.5 border ${
+                    withinLimit
+                      ? "bg-green-500/10 border-green-400/30"
+                      : "bg-red-500/10 border-red-400/30"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">
+                        🍃 {formatWeekRange(row.week_start)}
+                      </p>
+
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 mt-2">
+                          <input
+                            type="number"
+                            value={editingAlcoholCount}
+                            onChange={(e) => setEditingAlcoholCount(e.target.value)}
+                            className="w-24 bg-card border border-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
+                          />
+                          <span className="text-xs text-muted">drinks</span>
+                        </div>
+                      ) : (
                         <p className="text-xs text-muted mt-0.5">
                           {row.drink_count} / {alcoholLimit} drinks
                           {!withinLimit && overBy > 0
                             ? ` • ${overBy} over target`
                             : ""}
                         </p>
-                      </div>
-
-                      {withinLimit ? (
-                        <span className="text-xs font-medium text-green-300 bg-green-400/20 px-2 py-1 rounded-full">
-                          Maintained ✓
-                        </span>
-                      ) : (
-                        <span className="text-xs font-medium text-red-300 bg-red-400/20 px-2 py-1 rounded-full">
-                          Over target
-                        </span>
                       )}
                     </div>
+
+                    {!isEditing && withinLimit && (
+                      <span className="text-xs font-medium text-green-300 bg-green-400/20 px-2 py-1 rounded-full">
+                        Maintained ✓
+                      </span>
+                    )}
+
+                    {!isEditing && !withinLimit && (
+                      <span className="text-xs font-medium text-red-300 bg-red-400/20 px-2 py-1 rounded-full">
+                        Over target
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+
+                  <div className="flex gap-2 mt-3">
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={() => saveAlcohol(row.week_start)}
+                          disabled={savingHabit}
+                          className="flex-1 bg-accent text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setEditingAlcoholWeek(null);
+                            setEditingAlcoholCount("");
+                          }}
+                          className="flex-1 bg-surface border border-border text-muted text-xs font-semibold py-2 rounded-xl hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingAlcoholWeek(row.week_start);
+                            setEditingAlcoholCount(String(row.drink_count));
+                          }}
+                          className="flex-1 border border-border text-muted text-xs font-medium py-2 rounded-xl hover:text-white hover:border-accent/50"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={() => deleteAlcohol(row.week_start)}
+                          disabled={savingHabit}
+                          className="flex-1 border border-red-400/30 text-red-400 text-xs font-medium py-2 rounded-xl hover:bg-red-400/10 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
   
 function Stat({ label, value }: { label: string; value: string }) {
   return (
