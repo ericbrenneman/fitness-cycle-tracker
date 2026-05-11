@@ -1,6 +1,5 @@
 "use client";
 
-import { getNextCycleStepFromLogs } from "@/lib/cycle";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -11,6 +10,14 @@ import WeekSummary from "@/components/WeekSummary";
 import NextWorkout from "@/components/NextWorkout";
 import RecoveryWarning from "@/components/RecoveryWarning";
 import { loadWorkoutMode, saveWorkoutMode, WorkoutMode } from "@/lib/userTemplates";
+import {
+  todayLocalISO,
+  currentWeekStart,
+  calcHydrationStreak,
+  calcAlcoholStreak,
+  hydrationGoalMet,
+  alcoholGoalMet,
+} from "@/lib/habits";
 
 export default function DashboardPage() {
   const [_user, setUser] = useState<{ email?: string; id: string } | null>(null);
@@ -22,6 +29,17 @@ export default function DashboardPage() {
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>("home");
   const [modeToggling, setModeToggling] = useState(false);
   const router = useRouter();
+
+  // Habit state
+  const [hydrationToday, setHydrationToday] = useState(0);
+  const [hydrationGoal, setHydrationGoal] = useState(100);
+  const [hydrationStreak, setHydrationStreak] = useState(0);
+  const [hydrationCustom, setHydrationCustom] = useState("");
+
+  const [alcoholThisWeek, setAlcoholThisWeek] = useState(0);
+  const [alcoholLimit, setAlcoholLimit] = useState(7);
+  const [alcoholStreak, setAlcoholStreak] = useState(0);
+  const [alcoholCustom, setAlcoholCustom] = useState("");
 
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
@@ -47,6 +65,55 @@ export default function DashboardPage() {
     }
   }, [supabase]);
 
+  const fetchHabits = useCallback(async (uid: string) => {
+    const today = todayLocalISO();
+    const weekStart = currentWeekStart();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [settingsRes, hydrationTodayRes, hydrationAllRes, alcoholWeekRes, alcoholAllRes] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from("user_settings") as any)
+        .select("hydration_goal_oz, weekly_alcohol_limit")
+        .eq("user_id", uid)
+        .single(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from("hydration_logs") as any)
+        .select("amount_oz")
+        .eq("user_id", uid)
+        .eq("logged_at", today)
+        .single(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from("hydration_logs") as any)
+        .select("logged_at, amount_oz")
+        .eq("user_id", uid)
+        .order("logged_at", { ascending: false })
+        .limit(60),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from("alcohol_logs") as any)
+        .select("drink_count")
+        .eq("user_id", uid)
+        .eq("week_start", weekStart)
+        .single(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from("alcohol_logs") as any)
+        .select("week_start, drink_count")
+        .eq("user_id", uid)
+        .order("week_start", { ascending: false })
+        .limit(26),
+    ]);
+
+    const goal = settingsRes.data?.hydration_goal_oz ?? 100;
+    const limit = settingsRes.data?.weekly_alcohol_limit ?? 7;
+    setHydrationGoal(goal);
+    setAlcoholLimit(limit);
+
+    setHydrationToday(hydrationTodayRes.data?.amount_oz ?? 0);
+    setAlcoholThisWeek(alcoholWeekRes.data?.drink_count ?? 0);
+
+    setHydrationStreak(calcHydrationStreak(hydrationAllRes.data ?? [], goal));
+    setAlcoholStreak(calcAlcoholStreak(alcoholAllRes.data ?? [], limit));
+  }, [supabase]);
+
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
@@ -61,7 +128,7 @@ export default function DashboardPage() {
         setUserId(retrySession.user.id);
         const mode = await loadWorkoutMode(supabase, retrySession.user.id);
         setWorkoutMode(mode);
-        await fetchLogs();
+        await Promise.all([fetchLogs(), fetchHabits(retrySession.user.id)]);
         if (!cancelled) setLoading(false);
         return;
       }
@@ -70,7 +137,7 @@ export default function DashboardPage() {
       setUserId(session.user.id);
       const mode = await loadWorkoutMode(supabase, session.user.id);
       setWorkoutMode(mode);
-      await fetchLogs();
+      await Promise.all([fetchLogs(), fetchHabits(session.user.id)]);
       if (!cancelled) setLoading(false);
     };
     init();
@@ -87,10 +154,41 @@ export default function DashboardPage() {
     setModeToggling(false);
   };
 
+  const addHydration = async (oz: number) => {
+    if (!userId) return;
+    const today = todayLocalISO();
+    const newTotal = hydrationToday + oz;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from("hydration_logs") as any).upsert(
+      { user_id: userId, logged_at: today, amount_oz: newTotal, updated_at: new Date().toISOString() },
+      { onConflict: "user_id,logged_at" }
+    );
+    setHydrationToday(newTotal);
+    // Refresh streak
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase.from("hydration_logs") as any)
+      .select("logged_at, amount_oz")
+      .eq("user_id", userId)
+      .order("logged_at", { ascending: false })
+      .limit(60);
+    setHydrationStreak(calcHydrationStreak(data ?? [], hydrationGoal));
+  };
+
+  const addAlcohol = async (drinks: number) => {
+    if (!userId) return;
+    const weekStart = currentWeekStart();
+    const newTotal = alcoholThisWeek + drinks;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from("alcohol_logs") as any).upsert(
+      { user_id: userId, week_start: weekStart, drink_count: newTotal, updated_at: new Date().toISOString() },
+      { onConflict: "user_id,week_start" }
+    );
+    setAlcoholThisWeek(newTotal);
+  };
+
   const handleLogWorkout = async (entry: WorkoutLogInsert) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return "Not logged in";
-
     const workoutPayload = {
       workout_type: entry.workout_type,
       duration: entry.duration,
@@ -100,7 +198,6 @@ export default function DashboardPage() {
       logged_at: entry.logged_at,
       user_id: session.user.id,
     };
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.from("workout_logs") as any).insert(workoutPayload);
     if (!error) {
@@ -123,27 +220,26 @@ export default function DashboardPage() {
     );
   }
 
+  const hydrationDone = hydrationGoalMet(hydrationToday, hydrationGoal);
+  const alcoholOk = alcoholGoalMet(alcoholThisWeek, alcoholLimit);
+
   return (
     <div className="flex flex-col flex-1 pb-28">
       <div className="flex items-center justify-between px-4 pt-10 pb-6">
         <div>
           <p className="text-muted text-xs mb-0.5">
             {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
+              weekday: "long", month: "long", day: "numeric",
             })}
           </p>
           <h1 className="text-xl font-bold">Apex Training Log</h1>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSignOut}
-            className="text-muted text-xs hover:text-white transition-colors border border-border rounded-lg px-3 py-1.5"
-          >
-            Sign out
-          </button>
-        </div>
+        <button
+          onClick={handleSignOut}
+          className="text-muted text-xs hover:text-white transition-colors border border-border rounded-lg px-3 py-1.5"
+        >
+          Sign out
+        </button>
       </div>
 
       <div className="flex flex-col gap-4 px-4">
@@ -204,9 +300,170 @@ export default function DashboardPage() {
           🧖 Log Recovery / Sauna
         </button>
 
+        {/* ── Apex Habits ─────────────────────────────────── */}
+        <div>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+            Apex Habits
+          </p>
+
+          {/* Hydration card */}
+          <div className={`rounded-2xl p-4 border mb-3 ${
+            hydrationDone
+              ? "bg-blue-500/10 border-blue-400/30"
+              : "bg-surface border-border"
+          }`}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  💧 Hydration
+                  {hydrationDone && (
+                    <span className="text-xs font-medium text-blue-300 bg-blue-400/20 px-2 py-0.5 rounded-full">
+                      Apex Habit ✓
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted mt-0.5">
+                  {hydrationDone
+                    ? "Daily goal reached"
+                    : `${hydrationToday} / ${hydrationGoal} oz today`}
+                </p>
+              </div>
+              {hydrationStreak > 0 && (
+                <div className="text-right">
+                  <p className="text-lg font-bold text-blue-300">{hydrationStreak}</p>
+                  <p className="text-xs text-muted">day streak</p>
+                </div>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-2 bg-white/10 rounded-full mb-3 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(100, Math.round((hydrationToday / hydrationGoal) * 100))}%`,
+                  background: hydrationDone ? "#3b82f6" : "#6c63ff",
+                }}
+              />
+            </div>
+
+            {/* Quick add buttons */}
+            <div className="flex gap-2">
+              {[8, 16, 24].map((oz) => (
+                <button
+                  key={oz}
+                  onClick={() => addHydration(oz)}
+                  className="flex-1 py-2 rounded-xl border border-border text-xs font-medium text-muted hover:text-white hover:border-accent/50 transition-colors"
+                >
+                  +{oz} oz
+                </button>
+              ))}
+              <div className="flex gap-1 flex-1">
+                <input
+                  type="number"
+                  value={hydrationCustom}
+                  onChange={(e) => setHydrationCustom(e.target.value)}
+                  placeholder="oz"
+                  className="w-full bg-card border border-border rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-accent text-center"
+                />
+                <button
+                  onClick={() => {
+                    const val = parseInt(hydrationCustom);
+                    if (val > 0) { addHydration(val); setHydrationCustom(""); }
+                  }}
+                  className="px-2 py-2 bg-accent rounded-xl text-white text-xs font-bold hover:bg-accent/90 transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Conscious Consumption card */}
+          <div className={`rounded-2xl p-4 border ${
+            !alcoholOk
+              ? "bg-red-500/10 border-red-400/30"
+              : alcoholThisWeek === 0
+              ? "bg-green-500/10 border-green-400/30"
+              : "bg-surface border-border"
+          }`}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  🍃 Conscious Consumption
+                  {alcoholOk && alcoholThisWeek <= alcoholLimit && (
+                    <span className="text-xs font-medium text-green-300 bg-green-400/20 px-2 py-0.5 rounded-full">
+                      Within limit
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted mt-0.5">
+                  {!alcoholOk
+                    ? `${alcoholThisWeek} / ${alcoholLimit} drinks — over target`
+                    : alcoholThisWeek === 0
+                    ? "Recovery protected this week"
+                    : `${alcoholThisWeek} / ${alcoholLimit} drinks this week`}
+                </p>
+              </div>
+              {alcoholStreak > 0 && (
+                <div className="text-right">
+                  <p className="text-lg font-bold text-green-300">{alcoholStreak}</p>
+                  <p className="text-xs text-muted">week streak</p>
+                </div>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-2 bg-white/10 rounded-full mb-3 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(100, Math.round((alcoholThisWeek / Math.max(alcoholLimit, 1)) * 100))}%`,
+                  background: !alcoholOk ? "#ef4444" : "#2ecc71",
+                }}
+              />
+            </div>
+
+            {/* Quick add */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => addAlcohol(1)}
+                className="flex-1 py-2 rounded-xl border border-border text-xs font-medium text-muted hover:text-white hover:border-accent/50 transition-colors"
+              >
+                +1 drink
+              </button>
+              <div className="flex gap-1 flex-1">
+                <input
+                  type="number"
+                  value={alcoholCustom}
+                  onChange={(e) => setAlcoholCustom(e.target.value)}
+                  placeholder="drinks"
+                  className="w-full bg-card border border-border rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-accent text-center"
+                />
+                <button
+                  onClick={() => {
+                    const val = parseInt(alcoholCustom);
+                    if (val > 0) { addAlcohol(val); setAlcoholCustom(""); }
+                  }}
+                  className="px-2 py-2 bg-accent rounded-xl text-white text-xs font-bold hover:bg-accent/90 transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {!alcoholOk && (
+              <p className="text-xs text-red-300/80 mt-2 text-center">
+                Weekly target exceeded — refocus and protect your recovery.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Recent entries */}
         <div>
           <h2 className="text-xs font-semibold text-muted tracking-wider uppercase mb-3">
-            Last 7 Entries
+            Recent
           </h2>
           {logs.length === 0 ? (
             <div className="bg-surface border border-border rounded-2xl p-6 text-center">
@@ -215,7 +472,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {logs.slice(0, 7).map((log) => (
+              {logs.slice(0, 3).map((log) => (
                 <WorkoutCard key={log.id} log={log} />
               ))}
             </div>
