@@ -480,9 +480,17 @@ function DetailView({
               Exercises
             </p>
             <div className="flex flex-col gap-4">
-              {Array.from(exerciseMap.entries()).map(([name, sets]) => (
-                <div key={name}>
-                  <p className="text-sm font-semibold mb-2">{name}</p>
+                  {Array.from(exerciseMap.entries()).map(([name, sets]) => (
+                    <div key={name}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-semibold">{name}</p>
+
+                          href={`/progress/${encodeURIComponent(name)}`}
+                          className="text-xs text-accent hover:text-white transition-colors"
+                        >
+                          View progress →
+                        </a>
+                      </div>
                   <div className="flex flex-col gap-1">
                     {sets
                       .sort((a, b) => a.set_number - b.set_number)
