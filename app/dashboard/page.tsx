@@ -308,15 +308,7 @@ export default function DashboardPage() {
     );
     setHydrationToday(newTotal);
     startHydrationUndoWindow(oz);
-    // Refresh streak
-    // Refresh streak
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase.from("hydration_logs") as any)
-      .select("logged_at, amount_oz")
-      .eq("user_id", userId)
-      .order("logged_at", { ascending: false })
-      .limit(60);
-    setHydrationStreak(calcHydrationStreak(data ?? [], hydrationGoal));
+    await fetchHabits(userId);
   };
 
   const undoHydration = async () => {
@@ -344,14 +336,7 @@ export default function DashboardPage() {
       hydrationUndoTimer.current = null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase.from("hydration_logs") as any)
-      .select("logged_at, amount_oz")
-      .eq("user_id", userId)
-      .order("logged_at", { ascending: false })
-      .limit(60);
-
-    setHydrationStreak(calcHydrationStreak(data ?? [], hydrationGoal));
+    await fetchHabits(userId);
   };
 
   const addAlcohol = async (drinks: number) => {
@@ -365,6 +350,7 @@ export default function DashboardPage() {
     );
     setAlcoholThisWeek(newTotal);
     startAlcoholUndoWindow(drinks);
+    await fetchHabits(userId);
   };
 
   const undoAlcohol = async () => {
@@ -391,6 +377,8 @@ export default function DashboardPage() {
       clearTimeout(alcoholUndoTimer.current);
       alcoholUndoTimer.current = null;
     }
+    
+    await fetchHabits(userId);
   };
 
   const handleLogWorkout = async (entry: WorkoutLogInsert) => {
