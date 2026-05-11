@@ -1,5 +1,6 @@
 "use client";
 
+import { saveCycleState, workoutTypeToCycleStep } from "@/lib/cycle";
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { WorkoutTemplate, StrengthExercise, StrengthExerciseInsert, WorkoutLog } from "@/lib/types";
@@ -319,7 +320,7 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone, 
       });
     }
 
-    if (setsToInsert.length > 0) {
+  if (setsToInsert.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: setsError } = await (supabase.from("strength_exercises") as any)
         .insert(setsToInsert);
@@ -329,6 +330,12 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone, 
         setSaving(false);
         return;
       }
+    }
+
+    // Save persistent cycle state
+    const completedStep = workoutTypeToCycleStep(cycleStep, cycleStep);
+    if (completedStep) {
+      await saveCycleState(supabase, session.user.id, completedStep);
     }
 
     onDone();

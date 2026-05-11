@@ -1,5 +1,6 @@
 "use client";
 
+import { saveCycleState, workoutTypeToCycleStep } from "@/lib/cycle";
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CardioTemplate, CardioModality } from "@/lib/types";
@@ -82,11 +83,15 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
     const { error: cardioError } = await (supabase.from("cardio_details") as any)
       .insert(cardioPayload);
 
-    if (cardioError) {
+  if (cardioError) {
       setError(cardioError.message);
       setSaving(false);
       return;
     }
+
+    // Save persistent cycle state
+    const completedStep = cycleStep === "Cardio1" ? "Cardio1" : "Cardio2";
+    await saveCycleState(supabase, session.user.id, completedStep);
 
     onDone();
   };
