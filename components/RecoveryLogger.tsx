@@ -130,7 +130,7 @@
             if (advancesCycle) {
               const state = await loadCycleState(supabase, session.user.id);
               const expectedNext = state?.current_step ?? "Rest1";
-              const completedStep = workoutTypeToCycleStep(workoutType, expectedNext as any);
+              const completedStep = workoutTypeToCycleStep(selectedTypes[0], expectedNext as any);
               if (completedStep) {
                 await saveCycleState(supabase, session.user.id, completedStep);
               }
