@@ -324,9 +324,15 @@ export default function DashboardPage() {
                 </p>
                 <p className="text-xs text-muted mt-0.5">
                   {hydrationDone
-                    ? "Daily goal reached"
+                    ? `Daily goal reached • ${hydrationToday} / ${hydrationGoal} oz`
                     : `${hydrationToday} / ${hydrationGoal} oz today`}
                 </p>
+
+                {hydrationDone && hydrationToday > hydrationGoal && (
+                  <p className="text-xs text-blue-300 mt-1">
+                    +{hydrationToday - hydrationGoal} oz over target
+                  </p>
+                )}
               </div>
               {hydrationStreak > 0 && (
                 <div className="text-right">
