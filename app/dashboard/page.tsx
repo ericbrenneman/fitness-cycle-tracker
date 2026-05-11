@@ -34,12 +34,17 @@ export default function DashboardPage() {
   const [hydrationToday, setHydrationToday] = useState(0);
   const [hydrationGoal, setHydrationGoal] = useState(100);
   const [hydrationStreak, setHydrationStreak] = useState(0);
+  const [hydrationAvg7, setHydrationAvg7] = useState(0);
+  const [hydrationGoalDays7, setHydrationGoalDays7] = useState(0);
   const [hydrationCustom, setHydrationCustom] = useState("");
   const [lastHydrationAdd, setLastHydrationAdd] = useState<number | null>(null);
 
   const [alcoholThisWeek, setAlcoholThisWeek] = useState(0);
   const [alcoholLimit, setAlcoholLimit] = useState(7);
   const [alcoholStreak, setAlcoholStreak] = useState(0);
+  const [alcoholAvg4, setAlcoholAvg4] = useState(0);
+  const [alcoholWithinLimit4, setAlcoholWithinLimit4] = useState(0);
+  const [alcoholTrackedWeeks4, setAlcoholTrackedWeeks4] = useState(0);
   const [alcoholCustom, setAlcoholCustom] = useState("");
   const [lastAlcoholAdd, setLastAlcoholAdd] = useState<number | null>(null);
 
@@ -70,6 +75,89 @@ export default function DashboardPage() {
     }
   }, [supabase]);
 
+  const subtractLocalDays = (iso: string, days: number) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() - days);
+
+    const yr = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, "0");
+    const dy = String(date.getDate()).padStart(2, "0");
+
+    return `${yr}-${mo}-${dy}`;
+  };
+
+  const subtractLocalWeeks = (weekStartIso: string, weeks: number) => {
+    return subtractLocalDays(weekStartIso, weeks * 7);
+  };
+
+  const calculateHydrationInsights = (
+    rows: { logged_at: string; amount_oz: number }[],
+    goalOz: number
+  ) => {
+    const today = todayLocalISO();
+    const byDate = new Map<string, number>();
+
+    for (const row of rows) {
+      byDate.set(row.logged_at, (byDate.get(row.logged_at) ?? 0) + row.amount_oz);
+    }
+
+    let total = 0;
+    let goalDays = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const date = subtractLocalDays(today, i);
+      const amount = byDate.get(date) ?? 0;
+
+      total += amount;
+
+      if (amount >= goalOz) {
+        goalDays++;
+      }
+    }
+
+    return {
+      avg: Math.round(total / 7),
+      goalDays,
+    };
+  };
+
+  const calculateAlcoholInsights = (
+    rows: { week_start: string; drink_count: number }[],
+    limit: number
+  ) => {
+    const thisWeek = currentWeekStart();
+    const byWeek = new Map<string, number>();
+
+    for (const row of rows) {
+      byWeek.set(row.week_start, (byWeek.get(row.week_start) ?? 0) + row.drink_count);
+    }
+
+    let total = 0;
+    let trackedWeeks = 0;
+    let withinLimit = 0;
+
+    for (let i = 1; i <= 4; i++) {
+      const weekStart = subtractLocalWeeks(thisWeek, i);
+      const count = byWeek.get(weekStart);
+
+      if (count === undefined) continue;
+
+      trackedWeeks++;
+      total += count;
+
+      if (count <= limit) {
+        withinLimit++;
+      }
+    }
+
+    return {
+      avg: trackedWeeks > 0 ? Math.round((total / trackedWeeks) * 10) / 10 : 0,
+      withinLimit,
+      trackedWeeks,
+    };
+  };
+  
   const fetchHabits = useCallback(async (uid: string) => {
     const today = todayLocalISO();
     const weekStart = currentWeekStart();
@@ -115,8 +203,20 @@ export default function DashboardPage() {
     setHydrationToday(hydrationTodayRes.data?.amount_oz ?? 0);
     setAlcoholThisWeek(alcoholWeekRes.data?.drink_count ?? 0);
 
-    setHydrationStreak(calcHydrationStreak(hydrationAllRes.data ?? [], goal));
-    setAlcoholStreak(calcAlcoholStreak(alcoholAllRes.data ?? [], limit));
+    const hydrationRows = hydrationAllRes.data ?? [];
+    const alcoholRows = alcoholAllRes.data ?? [];
+
+    setHydrationStreak(calcHydrationStreak(hydrationRows, goal));
+    setAlcoholStreak(calcAlcoholStreak(alcoholRows, limit));
+
+    const hydrationInsights = calculateHydrationInsights(hydrationRows, goal);
+    setHydrationAvg7(hydrationInsights.avg);
+    setHydrationGoalDays7(hydrationInsights.goalDays);
+
+    const alcoholInsights = calculateAlcoholInsights(alcoholRows, limit);
+    setAlcoholAvg4(alcoholInsights.avg);
+    setAlcoholWithinLimit4(alcoholInsights.withinLimit);
+    setAlcoholTrackedWeeks4(alcoholInsights.trackedWeeks);
   }, [supabase]);
 
   useEffect(() => {
@@ -591,7 +691,35 @@ export default function DashboardPage() {
           </div>
         </div>
         
+        {/* Apex Habits Insights card */}
+        <div className="bg-surface border border-border rounded-2xl p-4">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+            Apex Habits Insights
+          </p>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-card border border-border rounded-xl p-3">
+              <p className="text-xs text-muted mb-1">💧 7-day average</p>
+              <p className="text-lg font-bold">{hydrationAvg7} oz</p>
+              <p className="text-xs text-muted mt-0.5">
+                Goal hit {hydrationGoalDays7} of 7 days
+              </p>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-3">
+              <p className="text-xs text-muted mb-1">🍃 4-week average</p>
+              <p className="text-lg font-bold">{alcoholAvg4} drinks</p>
+              <p className="text-xs text-muted mt-0.5">
+                {alcoholTrackedWeeks4 > 0
+                  ? `Within limit ${alcoholWithinLimit4} of ${alcoholTrackedWeeks4} tracked week${
+                      alcoholTrackedWeeks4 === 1 ? "" : "s"
+                    }`
+                  : "No completed weeks tracked yet"}
+              </p>
+            </div>
+          </div>
+        </div>
+        
         {/* Recent entries */}
         <div>
           <h2 className="text-xs font-semibold text-muted tracking-wider uppercase mb-3">
