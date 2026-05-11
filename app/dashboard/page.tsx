@@ -687,7 +687,7 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-card border border-border rounded-xl p-3">
-              <p className="text-xs text-muted mb-1">💧 7-day average</p>
+              <p className="text-xs text-muted mb-1">💧 Live 7-day avg.</p>
               <p className="text-lg font-bold">{hydrationAvg7} oz</p>
               <p className="text-xs text-muted mt-0.5">
                 Goal hit {hydrationGoalDays7} of 7 days
