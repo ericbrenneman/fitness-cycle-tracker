@@ -35,11 +35,16 @@ export default function DashboardPage() {
   const [hydrationGoal, setHydrationGoal] = useState(100);
   const [hydrationStreak, setHydrationStreak] = useState(0);
   const [hydrationCustom, setHydrationCustom] = useState("");
+  const [lastHydrationAdd, setLastHydrationAdd] = useState<number | null>(null);
 
   const [alcoholThisWeek, setAlcoholThisWeek] = useState(0);
   const [alcoholLimit, setAlcoholLimit] = useState(7);
   const [alcoholStreak, setAlcoholStreak] = useState(0);
   const [alcoholCustom, setAlcoholCustom] = useState("");
+  const [lastAlcoholAdd, setLastAlcoholAdd] = useState<number | null>(null);
+
+  const hydrationUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const alcoholUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
@@ -145,6 +150,18 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (hydrationUndoTimer.current) {
+        clearTimeout(hydrationUndoTimer.current);
+      }
+
+      if (alcoholUndoTimer.current) {
+        clearTimeout(alcoholUndoTimer.current);
+      }
+    };
+  }, []);
+
   const handleToggleMode = async () => {
     if (!userId) return;
     setModeToggling(true);
@@ -154,6 +171,32 @@ export default function DashboardPage() {
     setModeToggling(false);
   };
 
+  const startHydrationUndoWindow = (oz: number) => {
+    if (hydrationUndoTimer.current) {
+      clearTimeout(hydrationUndoTimer.current);
+    }
+
+    setLastHydrationAdd(oz);
+
+    hydrationUndoTimer.current = setTimeout(() => {
+      setLastHydrationAdd(null);
+      hydrationUndoTimer.current = null;
+    }, 60000);
+  };
+
+  const startAlcoholUndoWindow = (drinks: number) => {
+    if (alcoholUndoTimer.current) {
+      clearTimeout(alcoholUndoTimer.current);
+    }
+
+    setLastAlcoholAdd(drinks);
+
+    alcoholUndoTimer.current = setTimeout(() => {
+      setLastAlcoholAdd(null);
+      alcoholUndoTimer.current = null;
+    }, 60000);
+  };
+  
   const addHydration = async (oz: number) => {
     if (!userId) return;
     const today = todayLocalISO();
@@ -164,6 +207,8 @@ export default function DashboardPage() {
       { onConflict: "user_id,logged_at" }
     );
     setHydrationToday(newTotal);
+    startHydrationUndoWindow(oz);
+    // Refresh streak
     // Refresh streak
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (supabase.from("hydration_logs") as any)
@@ -171,6 +216,41 @@ export default function DashboardPage() {
       .eq("user_id", userId)
       .order("logged_at", { ascending: false })
       .limit(60);
+    setHydrationStreak(calcHydrationStreak(data ?? [], hydrationGoal));
+  };
+
+  const undoHydration = async () => {
+    if (!userId || lastHydrationAdd === null) return;
+
+    const today = todayLocalISO();
+    const newTotal = Math.max(0, hydrationToday - lastHydrationAdd);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from("hydration_logs") as any).upsert(
+      {
+        user_id: userId,
+        logged_at: today,
+        amount_oz: newTotal,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,logged_at" }
+    );
+
+    setHydrationToday(newTotal);
+    setLastHydrationAdd(null);
+
+    if (hydrationUndoTimer.current) {
+      clearTimeout(hydrationUndoTimer.current);
+      hydrationUndoTimer.current = null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase.from("hydration_logs") as any)
+      .select("logged_at, amount_oz")
+      .eq("user_id", userId)
+      .order("logged_at", { ascending: false })
+      .limit(60);
+
     setHydrationStreak(calcHydrationStreak(data ?? [], hydrationGoal));
   };
 
@@ -184,6 +264,33 @@ export default function DashboardPage() {
       { onConflict: "user_id,week_start" }
     );
     setAlcoholThisWeek(newTotal);
+    startAlcoholUndoWindow(drinks);
+  };
+
+  const undoAlcohol = async () => {
+    if (!userId || lastAlcoholAdd === null) return;
+
+    const weekStart = currentWeekStart();
+    const newTotal = Math.max(0, alcoholThisWeek - lastAlcoholAdd);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from("alcohol_logs") as any).upsert(
+      {
+        user_id: userId,
+        week_start: weekStart,
+        drink_count: newTotal,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,week_start" }
+    );
+
+    setAlcoholThisWeek(newTotal);
+    setLastAlcoholAdd(null);
+
+    if (alcoholUndoTimer.current) {
+      clearTimeout(alcoholUndoTimer.current);
+      alcoholUndoTimer.current = null;
+    }
   };
 
   const handleLogWorkout = async (entry: WorkoutLogInsert) => {
@@ -381,9 +488,18 @@ export default function DashboardPage() {
                 >
                   +
                 </button>
+                  </div>
+                </div>
+
+                {lastHydrationAdd !== null && (
+                  <button
+                    onClick={undoHydration}
+                    className="w-full mt-2 text-xs text-blue-300 hover:text-white transition-colors"
+                  >
+                    Undo +{lastHydrationAdd} oz
+                  </button>
+                )}
               </div>
-            </div>
-          </div>
 
           {/* Conscious Consumption card */}
           <div className={`rounded-2xl p-4 border ${
@@ -458,6 +574,15 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {lastAlcoholAdd !== null && (
+              <button
+                onClick={undoAlcohol}
+                className="w-full mt-2 text-xs text-green-300 hover:text-white transition-colors"
+              >
+                Undo +{lastAlcoholAdd} drink{lastAlcoholAdd === 1 ? "" : "s"}
+              </button>
+            )}
+
             {!alcoholOk && (
               <p className="text-xs text-red-300/80 mt-2 text-center">
                 Weekly target exceeded — refocus and protect your recovery.
@@ -465,6 +590,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+        
 
         {/* Recent entries */}
         <div>
