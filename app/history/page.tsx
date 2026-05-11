@@ -4,12 +4,25 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { WorkoutLog, StrengthExercise, CardioDetail, RecoveryDetail } from "@/lib/types";
+import { weekEnd } from "@/lib/habits";
 
 interface WorkoutLogFull extends WorkoutLog {
   strength_exercises: StrengthExercise[];
   cardio_detail: CardioDetail | null;
   recovery_detail: RecoveryDetail | null;
 }
+
+interface HydrationHistoryRow {
+  logged_at: string;
+  amount_oz: number;
+}
+
+interface AlcoholHistoryRow {
+  week_start: string;
+  drink_count: number;
+}
+
+type HistoryTab = "workouts" | "habits";
 
 const TYPE_META: Record<string, { emoji: string; color: string }> = {
   A:        { emoji: "💪", color: "#6c63ff" },
@@ -120,19 +133,71 @@ async function fetchAllLogs(
   }));
 }
 
+async function fetchHabitHistory(
+  supabase: ReturnType<typeof createClient>,
+  userId: string
+): Promise<{
+  hydrationRows: HydrationHistoryRow[];
+  alcoholRows: AlcoholHistoryRow[];
+  hydrationGoal: number;
+  alcoholLimit: number;
+}> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [settingsRes, hydrationRes, alcoholRes] = await Promise.all([
+    (supabase.from("user_settings") as any)
+      .select("hydration_goal_oz, weekly_alcohol_limit")
+      .eq("user_id", userId)
+      .single(),
+
+    (supabase.from("hydration_logs") as any)
+      .select("logged_at, amount_oz")
+      .eq("user_id", userId)
+      .order("logged_at", { ascending: false })
+      .limit(90),
+
+    (supabase.from("alcohol_logs") as any)
+      .select("week_start, drink_count")
+      .eq("user_id", userId)
+      .order("week_start", { ascending: false })
+      .limit(26),
+  ]);
+
+  return {
+    hydrationRows: (hydrationRes.data ?? []) as HydrationHistoryRow[],
+    alcoholRows: (alcoholRes.data ?? []) as AlcoholHistoryRow[],
+    hydrationGoal: settingsRes.data?.hydration_goal_oz ?? 100,
+    alcoholLimit: settingsRes.data?.weekly_alcohol_limit ?? 7,
+  };
+}
+
 export default function HistoryPage() {
   const [logs, setLogs] = useState<WorkoutLogFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<WorkoutLogFull | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<HistoryTab>("workouts");
+
+  const [hydrationRows, setHydrationRows] = useState<HydrationHistoryRow[]>([]);
+  const [alcoholRows, setAlcoholRows] = useState<AlcoholHistoryRow[]>([]);
+  const [hydrationGoal, setHydrationGoal] = useState(100);
+  const [alcoholLimit, setAlcoholLimit] = useState(7);
+
   const router = useRouter();
 
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
   const reload = async (uid: string) => {
-    const fresh = await fetchAllLogs(supabase, uid);
+    const [fresh, habits] = await Promise.all([
+      fetchAllLogs(supabase, uid),
+      fetchHabitHistory(supabase, uid),
+    ]);
+
     setLogs(fresh);
+    setHydrationRows(habits.hydrationRows);
+    setAlcoholRows(habits.alcoholRows);
+    setHydrationGoal(habits.hydrationGoal);
+    setAlcoholLimit(habits.alcoholLimit);
   };
 
   useEffect(() => {
@@ -140,8 +205,18 @@ export default function HistoryPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push("/auth"); return; }
       setUserId(session.user.id);
-      const fresh = await fetchAllLogs(supabase, session.user.id);
+
+      const [fresh, habits] = await Promise.all([
+        fetchAllLogs(supabase, session.user.id),
+        fetchHabitHistory(supabase, session.user.id),
+      ]);
+
       setLogs(fresh);
+      setHydrationRows(habits.hydrationRows);
+      setAlcoholRows(habits.alcoholRows);
+      setHydrationGoal(habits.hydrationGoal);
+      setAlcoholLimit(habits.alcoholLimit);
+
       setLoading(false);
     };
     init();
@@ -158,7 +233,7 @@ export default function HistoryPage() {
     }
   };
 
-  const handleUpdate = async (log: WorkoutLogFull) => {
+  const handleUpdate = async () => {
     setSelected(null);
     if (userId) await reload(userId);
   };
@@ -183,15 +258,44 @@ export default function HistoryPage() {
     );
   }
 
-  return (
-    <div className="flex flex-col flex-1 pb-24">
-      <div className="flex items-center justify-between px-4 pt-10 pb-6">
-        <div>
-          <h1 className="text-xl font-bold">History</h1>
-          <p className="text-muted text-xs mt-0.5">{logs.length} entries</p>
-        </div>
+return (
+  <div className="flex flex-col flex-1 pb-24">
+    <div className="flex items-center justify-between px-4 pt-10 pb-4">
+      <div>
+        <h1 className="text-xl font-bold">History</h1>
+        <p className="text-muted text-xs mt-0.5">
+          {activeTab === "workouts"
+            ? `${logs.length} workout entries`
+            : `${hydrationRows.length + alcoholRows.length} habit entries`}
+        </p>
       </div>
+    </div>
 
+    <div className="flex gap-1 mx-4 mb-4 bg-surface border border-border rounded-xl p-1">
+      <button
+        onClick={() => setActiveTab("workouts")}
+        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+          activeTab === "workouts"
+            ? "bg-accent text-white"
+            : "text-muted hover:text-white"
+        }`}
+      >
+        💪 Workouts
+      </button>
+
+      <button
+        onClick={() => setActiveTab("habits")}
+        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+          activeTab === "habits"
+            ? "bg-accent text-white"
+            : "text-muted hover:text-white"
+        }`}
+      >
+        💧 Apex Habits
+      </button>
+    </div>
+
+    {activeTab === "workouts" ? (
       <div className="flex flex-col gap-2 px-4">
         {logs.length === 0 ? (
           <div className="bg-surface border border-border rounded-2xl p-6 text-center">
@@ -202,8 +306,11 @@ export default function HistoryPage() {
             const meta = TYPE_META[log.workout_type] ?? TYPE_META.Other;
             const [yr, mo, dy] = log.logged_at.split("-").map(Number);
             const date = new Date(yr, mo - 1, dy).toLocaleDateString("en-US", {
-              weekday: "short", month: "short", day: "numeric",
+              weekday: "short",
+              month: "short",
+              day: "numeric",
             });
+
             return (
               <button
                 key={log.id}
@@ -216,44 +323,71 @@ export default function HistoryPage() {
                 >
                   {meta.emoji}
                 </div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                 <span className="font-semibold text-sm">
-                    {TYPE_LABELS[log.workout_type] ?? log.workout_type}
-                 </span>
-                    <span className="text-muted text-xs flex-shrink-0">{date}</span>
+                    <span className="font-semibold text-sm">
+                      {TYPE_LABELS[log.workout_type] ?? log.workout_type}
+                    </span>
+                    <span className="text-muted text-xs flex-shrink-0">
+                      {date}
+                    </span>
                   </div>
+
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                     <span className="text-muted text-xs">{log.duration} min</span>
+
                     {log.effort !== null && (
-                      <span className="text-muted text-xs">RPE {log.effort}/10</span>
+                      <span className="text-muted text-xs">
+                        RPE {log.effort}/10
+                      </span>
                     )}
+
                     {log.strength_exercises.length > 0 && (
                       <span className="text-muted text-xs">
                         {log.strength_exercises.length} sets logged
                       </span>
                     )}
+
                     {log.cardio_detail?.modality && (
-                      <span className="text-muted text-xs">{log.cardio_detail.modality}</span>
+                      <span className="text-muted text-xs">
+                        {log.cardio_detail.modality}
+                      </span>
                     )}
+
                     {log.advances_cycle && (
-                      <span className="text-xs font-medium" style={{ color: meta.color }}>
+                      <span
+                        className="text-xs font-medium"
+                        style={{ color: meta.color }}
+                      >
                         ↑ cycle
                       </span>
                     )}
                   </div>
+
                   {log.notes && (
-                    <p className="text-muted text-xs mt-1 truncate">{log.notes}</p>
+                    <p className="text-muted text-xs mt-1 truncate">
+                      {log.notes}
+                    </p>
                   )}
                 </div>
+
                 <span className="text-muted text-xs mt-1">›</span>
               </button>
             );
           })
         )}
       </div>
-    </div>
-  );
+    ) : (
+      <HabitHistory
+        hydrationRows={hydrationRows}
+        alcoholRows={alcoholRows}
+        hydrationGoal={hydrationGoal}
+        alcoholLimit={alcoholLimit}
+      />
+    )}
+  </div>
+);
 }
 
 // ============================================================
@@ -575,6 +709,146 @@ function DetailView({
   );
 }
 
+  function formatLocalDate(iso: string): string {
+    const [yr, mo, dy] = iso.split("-").map(Number);
+
+    return new Date(yr, mo - 1, dy).toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  function formatWeekRange(weekStart: string): string {
+    return `${formatLocalDate(weekStart)} – ${formatLocalDate(weekEnd(weekStart))}`;
+  }
+
+  function HabitHistory({
+    hydrationRows,
+    alcoholRows,
+    hydrationGoal,
+    alcoholLimit,
+  }: {
+    hydrationRows: HydrationHistoryRow[];
+    alcoholRows: AlcoholHistoryRow[];
+    hydrationGoal: number;
+    alcoholLimit: number;
+  }) {
+    return (
+      <div className="flex flex-col gap-4 px-4">
+        <div>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+            Hydration
+          </p>
+
+          {hydrationRows.length === 0 ? (
+            <div className="bg-surface border border-border rounded-2xl p-5 text-center">
+              <p className="text-muted text-sm">No hydration history yet.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {hydrationRows.map((row) => {
+                const complete = row.amount_oz >= hydrationGoal;
+                const overBy = row.amount_oz - hydrationGoal;
+
+                return (
+                  <div
+                    key={row.logged_at}
+                    className={`rounded-2xl px-4 py-3.5 border ${
+                      complete
+                        ? "bg-blue-500/10 border-blue-400/30"
+                        : "bg-surface border-border"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          💧 {formatLocalDate(row.logged_at)}
+                        </p>
+                        <p className="text-xs text-muted mt-0.5">
+                          {row.amount_oz} / {hydrationGoal} oz
+                          {complete && overBy > 0
+                            ? ` • +${overBy} oz over target`
+                            : ""}
+                        </p>
+                      </div>
+
+                      {complete ? (
+                        <span className="text-xs font-medium text-blue-300 bg-blue-400/20 px-2 py-1 rounded-full">
+                          Apex Habit ✓
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted">
+                          {Math.max(hydrationGoal - row.amount_oz, 0)} oz short
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+            Conscious Consumption
+          </p>
+
+          {alcoholRows.length === 0 ? (
+            <div className="bg-surface border border-border rounded-2xl p-5 text-center">
+              <p className="text-muted text-sm">
+                No conscious consumption history yet.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {alcoholRows.map((row) => {
+                const withinLimit = row.drink_count <= alcoholLimit;
+                const overBy = row.drink_count - alcoholLimit;
+
+                return (
+                  <div
+                    key={row.week_start}
+                    className={`rounded-2xl px-4 py-3.5 border ${
+                      withinLimit
+                        ? "bg-green-500/10 border-green-400/30"
+                        : "bg-red-500/10 border-red-400/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          🍃 {formatWeekRange(row.week_start)}
+                        </p>
+                        <p className="text-xs text-muted mt-0.5">
+                          {row.drink_count} / {alcoholLimit} drinks
+                          {!withinLimit && overBy > 0
+                            ? ` • ${overBy} over target`
+                            : ""}
+                        </p>
+                      </div>
+
+                      {withinLimit ? (
+                        <span className="text-xs font-medium text-green-300 bg-green-400/20 px-2 py-1 rounded-full">
+                          Maintained ✓
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-red-300 bg-red-400/20 px-2 py-1 rounded-full">
+                          Over target
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
