@@ -550,7 +550,7 @@ export default function DashboardPage() {
 
             {/* Quick add buttons */}
             <div className="flex gap-2">
-              {[8, 16, 24].map((oz) => (
+              {[8, 12, 24].map((oz) => (
                 <button
                   key={oz}
                   onClick={() => addHydration(oz)}
