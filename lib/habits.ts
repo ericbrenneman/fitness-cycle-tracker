@@ -87,18 +87,25 @@ export function calcHydrationStreak(
 
   const today = todayLocalISO();
 
-  // Build a map of date → amount
+  // Build a map of date → amount.
+  // This safely handles both the preferred one-row-per-day setup
+  // and any duplicate test rows that may already exist.
   const byDate = new Map<string, number>();
+
   for (const log of logs) {
-    byDate.set(log.logged_at, log.amount_oz);
+    byDate.set(
+      log.logged_at,
+      (byDate.get(log.logged_at) ?? 0) + log.amount_oz
+    );
   }
 
-  // Walk backwards from yesterday
+  // Count from today so hitting today's goal immediately shows 1 day.
   let streak = 0;
-  let check = subtractDays(today, 1);
+  let check = today;
 
   for (let i = 0; i < 365; i++) {
     const amount = byDate.get(check) ?? 0;
+
     if (amount >= goalOz) {
       streak++;
       check = subtractDays(check, 1);
@@ -127,22 +134,37 @@ export function calcAlcoholStreak(
 
   const thisWeek = currentWeekStart();
 
-  // Build map of week_start → drink_count
+  // Build a map of week_start → drink_count.
+  // This safely handles the preferred one-row-per-week setup
+  // and any duplicate test rows that may already exist.
   const byWeek = new Map<string, number>();
+
   for (const log of logs) {
-    byWeek.set(log.week_start, log.drink_count);
+    byWeek.set(
+      log.week_start,
+      (byWeek.get(log.week_start) ?? 0) + log.drink_count
+    );
   }
 
-  // Walk backwards from last completed week
+  // Start from the last completed week.
+  // Current week shows progress, but does not count toward streak yet.
   let streak = 0;
   let check = previousWeekStart();
 
   for (let i = 0; i < 52; i++) {
-    if (check >= thisWeek) break; // safety guard
+    if (check >= thisWeek) break;
+
+    // Critical fix:
+    // Missing data does NOT mean a successful 0-drink week.
+    // If there is no row for that week, the streak stops.
+    if (!byWeek.has(check)) {
+      break;
+    }
+
     const count = byWeek.get(check) ?? 0;
+
     if (count <= limit) {
       streak++;
-      // Go back one more week
       check = subtractDays(check, 7);
     } else {
       break;
