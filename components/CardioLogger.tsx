@@ -1,6 +1,6 @@
 "use client";
 
-import { saveCycleState, workoutTypeToCycleStep } from "@/lib/cycle";
+
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CardioTemplate, CardioModality } from "@/lib/types";
@@ -9,13 +9,25 @@ interface Props {
   cycleStep: "Cardio1" | "Cardio2";
   template: CardioTemplate;
   onDone: () => void;
+  advancesCycle?: boolean;
+  title?: string;
+  subtitle?: string;
+  saveLabel?: string;
 }
 
 const MODALITIES: CardioModality[] = [
   "Peloton", "Treadmill", "Bike", "Rower", "Elliptical", "Outdoor Walk", "Other",
 ];
 
-export default function CardioLogger({ cycleStep, template, onDone }: Props) {
+export default function CardioLogger({
+      cycleStep,
+      template,
+      onDone,
+      advancesCycle = true,
+      title,
+      subtitle = "Starting workout",
+      saveLabel,
+    }: Props) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
@@ -53,7 +65,7 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
       duration: parseInt(duration) || 0,
       effort: effort ? parseInt(effort) : null,
       notes: notes.trim() || null,
-      advances_cycle: true,
+      advances_cycle: advancesCycle,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,15 +95,11 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
     const { error: cardioError } = await (supabase.from("cardio_details") as any)
       .insert(cardioPayload);
 
-  if (cardioError) {
+    if (cardioError) {
       setError(cardioError.message);
       setSaving(false);
       return;
     }
-
-    // Save persistent cycle state
-    const completedStep = cycleStep === "Cardio1" ? "Cardio1" : "Cardio2";
-    await saveCycleState(supabase, session.user.id, completedStep);
 
     onDone();
   };
@@ -100,9 +108,9 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
     <div className="flex flex-col flex-1 pb-10">
       <div className="flex items-center justify-between px-4 pt-10 pb-4">
         <div>
-          <p className="text-muted text-xs mb-0.5">Starting workout</p>
+          <p className="text-muted text-xs mb-0.5">{subtitle}</p>
           <h1 className="text-xl font-bold">
-            {cycleStep === "Cardio1" ? "🚴" : "⚡"} {template.name}
+            {title ?? `${cycleStep === "Cardio1" ? "🚴" : "⚡"} ${template.name}`}
           </h1>
         </div>
         <button
@@ -117,7 +125,7 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
         {/* Instructions card */}
         <div className="bg-surface border border-border rounded-2xl p-4">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-            Today's prescription
+            {advancesCycle ? "Today's prescription" : "Activity notes"}
           </p>
           <p className="text-sm leading-relaxed text-white/80">{template.instructions}</p>
           <div className="flex gap-3 mt-3">
@@ -225,7 +233,7 @@ export default function CardioLogger({ cycleStep, template, onDone }: Props) {
           disabled={saving}
           className="w-full bg-accent text-white font-semibold py-4 rounded-2xl text-sm disabled:opacity-50 hover:bg-accent/90 transition-colors"
         >
-          {saving ? "Saving…" : "Complete Cardio ✓"}
+          {saving ? "Saving…" : saveLabel ?? "Complete Cardio ✓"}
         </button>
       </div>
     </div>
