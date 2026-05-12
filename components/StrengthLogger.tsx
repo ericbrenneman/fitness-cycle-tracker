@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { WorkoutTemplate, StrengthExercise, StrengthExerciseInsert, WorkoutLog } from "@/lib/types";
 import { getSuggestion, hasRecentIllness, getLastPerformance, LastPerformance } from "@/lib/progression";
+import { todayLocalISO } from "@/lib/habits";
 
 interface Props {
   cycleStep: "A" | "B" | "C";
@@ -166,7 +167,7 @@ export default function StrengthLogger({ cycleStep, template, pastLogs, onDone, 
   const [duration, setDuration] = useState("45");
   const [effort, setEffort] = useState("6");
   const [notes, setNotes] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(todayLocalISO());
   const [lastPerf, setLastPerf] = useState<Record<string, LastPerformance | null>>({});
   const [illnessFlag, setIllnessFlag] = useState(false);
   const [showTimer, setShowTimer] = useState(false);

@@ -4,6 +4,7 @@
         import { useState, useRef } from "react";
         import { createClient } from "@/lib/supabase/client";
         import { WorkoutType } from "@/lib/types";
+        import { todayLocalISO } from "@/lib/habits";
 
         interface Props {
           cycleStep: "Rest1" | "Rest2";
@@ -42,7 +43,7 @@
 
           const [saving, setSaving] = useState(false);
           const [saveError, setSaveError] = useState<string | null>(null);
-          const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+          const [date, setDate] = useState(todayLocalISO());
           const [selectedTypes, setSelectedTypes] = useState<WorkoutType[]>(["Rest"]);
 
           const toggleType = (type: WorkoutType) => {

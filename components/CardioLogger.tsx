@@ -5,6 +5,7 @@ import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CardioTemplate, CardioModality } from "@/lib/types";
 import { saveCycleState } from "@/lib/cycle";
+import { todayLocalISO } from "@/lib/habits";
 
 interface Props {
   cycleStep: "Cardio1" | "Cardio2";
@@ -34,7 +35,7 @@ export default function CardioLogger({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(todayLocalISO());
   const [duration, setDuration] = useState(String(template.duration_range[0]));
   const [effort, setEffort] = useState(cycleStep === "Cardio1" ? "4" : "7");
   const [modality, setModality] = useState<CardioModality | "">("");
