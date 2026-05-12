@@ -495,6 +495,13 @@ export default function DashboardPage() {
           🧖 Log Recovery / Sauna
         </button>
 
+        <button
+          onClick={() => router.push("/extra-cardio")}
+          className="w-full bg-surface border border-border text-white font-semibold py-3.5 rounded-2xl text-sm hover:border-accent/50 transition-colors"
+        >
+          🚶 Log Extra Cardio
+        </button>
+        
         {/* ── Apex Habits ─────────────────────────────────── */}
         <div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">

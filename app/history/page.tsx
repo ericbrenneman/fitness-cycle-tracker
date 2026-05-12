@@ -52,6 +52,14 @@ const TYPE_LABELS: Record<string, string> = {
   PEMF:         "PEMF Therapy",
 };
 
+function getWorkoutLabel(log: WorkoutLog): string {
+  if (log.workout_type === "Cardio" && !log.advances_cycle) {
+    return "Extra Cardio";
+  }
+
+  return TYPE_LABELS[log.workout_type] ?? log.workout_type;
+}
+
 async function fetchAllLogs(
   supabase: ReturnType<typeof createClient>,
   userId: string
@@ -327,7 +335,7 @@ return (
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-sm">
-                      {TYPE_LABELS[log.workout_type] ?? log.workout_type}
+                      {getWorkoutLabel(log)}
                     </span>
                     <span className="text-muted text-xs flex-shrink-0">
                       {date}
@@ -521,7 +529,7 @@ function DetailView({
           <div className="flex items-center gap-3 mb-3">
             <span className="text-3xl">{meta.emoji}</span>
             <div>
-              <p className="font-bold text-base">{TYPE_LABELS[log.workout_type] ?? log.workout_type}</p>
+              <p className="font-bold text-base">{getWorkoutLabel(log)}</p>
               <p className="text-muted text-xs mt-0.5">{date}</p>
             </div>
           </div>
