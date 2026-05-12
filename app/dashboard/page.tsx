@@ -485,7 +485,7 @@ export default function DashboardPage() {
           onClick={() => router.push("/workout")}
           className="w-full bg-accent text-white font-semibold py-3.5 rounded-2xl text-sm hover:bg-accent/90 transition-colors"
         >
-          {workoutMode === "travel" ? "✈️ Start Travel Workout" : "▶ Start Next Workout"}
+          {workoutMode === "travel" ? "✈️ Start Travel Workout" : "▶ Start Workout"}
         </button>
 
         <button
