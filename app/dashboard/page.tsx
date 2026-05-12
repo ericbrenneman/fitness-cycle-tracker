@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { WorkoutLog, WorkoutLogInsert } from "@/lib/types";
+import { WorkoutLog, WorkoutLogInsert, CycleStep } from "@/lib/types";
 import LogWorkoutModal from "@/components/LogWorkoutModal";
 import WorkoutCard from "@/components/WorkoutCard";
 import WeekSummary from "@/components/WeekSummary";
@@ -18,6 +18,7 @@ import {
   hydrationGoalMet,
   alcoholGoalMet,
 } from "@/lib/habits";
+import { resolveNextCycleStep } from "@/lib/cycle";
 
 export default function DashboardPage() {
   const [_user, setUser] = useState<{ email?: string; id: string } | null>(null);
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const [showModal, setShowModal] = useState(false);
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>("home");
   const [modeToggling, setModeToggling] = useState(false);
+  const [nextStep, setNextStep] = useState<CycleStep>("A");
   const router = useRouter();
 
   // Habit state
@@ -71,7 +73,17 @@ export default function DashboardPage() {
       setLogs([]);
     } else {
       setDbError(null);
-      setLogs((data as WorkoutLog[]) ?? []);
+
+      const fetchedLogs = (data as WorkoutLog[]) ?? [];
+      setLogs(fetchedLogs);
+
+      const resolvedNextStep = await resolveNextCycleStep(
+        supabase,
+        session.user.id,
+        fetchedLogs
+      );
+
+      setNextStep(resolvedNextStep);
     }
   }, [supabase]);
 
@@ -479,7 +491,7 @@ export default function DashboardPage() {
 
         <WeekSummary logs={logs} />
         <RecoveryWarning logs={logs} />
-        <NextWorkout logs={logs} />
+        <NextWorkout logs={logs} nextStepOverride={nextStep} />
 
         <button
           onClick={() => router.push("/workout")}
