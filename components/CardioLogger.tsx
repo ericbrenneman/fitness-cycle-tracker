@@ -4,6 +4,7 @@
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CardioTemplate, CardioModality } from "@/lib/types";
+import { saveCycleState } from "@/lib/cycle";
 
 interface Props {
   cycleStep: "Cardio1" | "Cardio2";
@@ -65,7 +66,7 @@ export default function CardioLogger({
       duration: parseInt(duration) || 0,
       effort: effort ? parseInt(effort) : null,
       notes: notes.trim() || null,
-      advances_cycle: advancesCycle,
+      advances_cycle: advancesCycle !== false,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,6 +102,16 @@ export default function CardioLogger({
       return;
     }
 
+    if (advancesCycle !== false) {
+      const cycleError = await saveCycleState(supabase, session.user.id, cycleStep);
+
+      if (cycleError) {
+        setError(cycleError);
+        setSaving(false);
+        return;
+      }
+    }
+    
     onDone();
   };
 
