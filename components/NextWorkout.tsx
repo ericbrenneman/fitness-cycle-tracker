@@ -109,7 +109,7 @@ export default function NextWorkout({ logs }: { logs: WorkoutLog[] }) {
       <div className="flex items-center justify-between text-xs text-muted pt-2 border-t border-border">
         <span>
           {loggedToday
-            ? "✅ Logged today"
+            ? "✅ Activity Logged today"
             : daysSinceLast === 0
             ? "Ready to train"
             : daysSinceLast === 1
