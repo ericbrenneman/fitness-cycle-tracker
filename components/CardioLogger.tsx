@@ -116,7 +116,7 @@ export default function CardioLogger({
   };
 
   return (
-    <div className="flex flex-col flex-1 pb-10">
+    <div className="flex flex-col flex-1 pb-32">
       <div className="flex items-center justify-between px-4 pt-10 pb-4">
         <div>
           <p className="text-muted text-xs mb-0.5">{subtitle}</p>
